@@ -197,7 +197,7 @@ class MessageBubble extends ConsumerWidget {
               title: const Text('Share'),
               onTap: () {
                 Navigator.pop(context);
-                Share.share(message.content);
+                SharePlus.instance.share(ShareParams(text: message.content));
               },
             ),
             if (isMe) ...[
