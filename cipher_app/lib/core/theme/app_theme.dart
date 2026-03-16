@@ -40,7 +40,7 @@ class AppTheme {
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Colors.white,
@@ -61,7 +61,7 @@ class AppTheme {
       foregroundColor: Colors.white,
     ),
     scaffoldBackgroundColor: const Color(0xFF0F0F1A),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: const Color(0xFF1A1A2E),

@@ -19,8 +19,14 @@ class ThreadScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Thread'),
-        subtitle: const Text('Reply to message'),
+        title: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Thread'),
+            SizedBox(height: 2),
+            Text('Reply to message', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+          ],
+        ),
       ),
       body: Column(
         children: [

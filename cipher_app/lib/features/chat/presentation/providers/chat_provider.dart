@@ -5,6 +5,7 @@ import '../../data/models/channel_model.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/dm_model.dart';
 import '../../data/repositories/chat_repository.dart';
+import '../../../auth/data/repositories/auth_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../workspace/presentation/providers/workspace_provider.dart';
 

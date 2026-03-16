@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../workspace/data/repositories/workspace_repository.dart';
 import '../../../workspace/presentation/providers/workspace_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
