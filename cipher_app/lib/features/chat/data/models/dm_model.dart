@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
 class DmModel extends Equatable {
@@ -18,26 +17,31 @@ class DmModel extends Equatable {
     required this.createdAt,
   });
 
-  factory DmModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory DmModel.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic v) {
+      if (v == null) return null;
+      if (v is String) return DateTime.parse(v);
+      if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
+      return null;
+    }
+
     return DmModel(
-      id: doc.id,
-      workspaceId: data['workspaceId'] ?? '',
-      memberIds: List<String>.from(data['memberIds'] ?? []),
-      lastMessage: data['lastMessage'],
-      lastMessageAt: data['lastMessageAt'] != null
-          ? (data['lastMessageAt'] as Timestamp).toDate()
-          : null,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      id: (json['id'] ?? '').toString(),
+      workspaceId: (json['workspaceId'] ?? '').toString(),
+      memberIds: (json['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      lastMessage: json['lastMessage']?.toString(),
+      lastMessageAt: parseDate(json['lastMessageAt']),
+      createdAt: parseDate(json['createdAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
+  Map<String, dynamic> toJson() => {
+    'id': id,
     'workspaceId': workspaceId,
     'memberIds': memberIds,
     'lastMessage': lastMessage,
-    'lastMessageAt': lastMessageAt != null ? Timestamp.fromDate(lastMessageAt!) : null,
-    'createdAt': Timestamp.fromDate(createdAt),
+    'lastMessageAt': lastMessageAt?.toUtc().toIso8601String(),
+    'createdAt': createdAt.toUtc().toIso8601String(),
   };
 
   String otherUserId(String myId) => memberIds.firstWhere((id) => id != myId);

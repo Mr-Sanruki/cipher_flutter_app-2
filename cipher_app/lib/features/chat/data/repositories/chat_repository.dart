@@ -1,111 +1,321 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:socket_io_client/socket_io_client.dart' as sio;
 import '../models/message_model.dart';
 import '../models/channel_model.dart';
 import '../models/group_model.dart';
 import '../models/dm_model.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../auth/data/repositories/auth_repository.dart';
 
-final chatRepositoryProvider = Provider<ChatRepository>((ref) => ChatRepository());
+final chatRepositoryProvider = Provider<ChatRepository>((ref) {
+  return ChatRepository(ref.watch(authRepositoryProvider));
+});
 
 class ChatRepository {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final AuthRepository _authRepo;
+  final Dio _dio;
+
+  sio.Socket? _socket;
+  final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
+  final Map<String, List<MessageModel>> _messageCache = {};
+
+  ChatRepository(this._authRepo)
+      : _dio = Dio(BaseOptions(
+          baseUrl: AppConstants.backendBaseUrl,
+          connectTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {'Content-Type': 'application/json'},
+        ));
+
+  Map<String, String> _headers() {
+    final token = _authRepo.getSavedToken();
+    if (token == null) throw Exception('UNAUTHORIZED');
+    return {'Authorization': 'Bearer $token'};
+  }
+
+  void _ensureSocketConnected() {
+    if (_socket != null && _socket!.connected) return;
+    final token = _authRepo.getSavedToken();
+    if (token == null) return;
+
+    final s = sio.io(
+      AppConstants.backendBaseUrl,
+      sio.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .setAuth({'token': token})
+          .build(),
+    );
+
+    s.on('connect', (_) {});
+    s.on('connect_error', (_) {});
+    s.connect();
+    _socket = s;
+  }
 
   // ─── Channels ───────────────────────────────────────────────
   Future<ChannelModel> createChannel({
     required String workspaceId,
     required String name,
-    required String createdBy,
     String? description,
     bool isAnnouncement = false,
   }) async {
-    final ref = _db.collection(AppConstants.channelsCollection).doc();
-    final channel = ChannelModel(
-      id: ref.id, workspaceId: workspaceId, name: name,
-      description: description, createdBy: createdBy,
-      isAnnouncement: isAnnouncement, createdAt: DateTime.now(),
-    );
-    await ref.set(channel.toFirestore());
-    return channel;
+    try {
+      final res = await _dio.post(
+        '/chats/channels',
+        data: {
+          'workspaceId': workspaceId,
+          'name': name,
+          'description': description,
+          'isAnnouncement': isAnnouncement,
+        },
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['channel'] is Map) {
+        return ChannelModel.fromJson(Map<String, dynamic>.from(data['channel']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Stream<List<ChannelModel>> getChannels(String workspaceId) => _db
-      .collection(AppConstants.channelsCollection)
-      .where('workspaceId', isEqualTo: workspaceId)
-      .orderBy('createdAt')
-      .snapshots()
-      .map((s) => s.docs.map(ChannelModel.fromFirestore).toList());
+  Stream<List<ChannelModel>> getChannels(String workspaceId, {Duration pollEvery = const Duration(seconds: 3)}) async* {
+    while (true) {
+      yield await listChannels(workspaceId);
+      await Future<void>.delayed(pollEvery);
+    }
+  }
+
+  Future<List<ChannelModel>> listChannels(String workspaceId) async {
+    try {
+      final res = await _dio.get(
+        '/chats/channels',
+        queryParameters: {'workspaceId': workspaceId},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => ChannelModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 
   // ─── Groups ──────────────────────────────────────────────────
   Future<GroupModel> createGroup({
     required String workspaceId,
     required String name,
-    required String createdBy,
     required List<String> memberIds,
   }) async {
-    final ref = _db.collection(AppConstants.groupsCollection).doc();
-    final group = GroupModel(
-      id: ref.id, workspaceId: workspaceId, name: name,
-      createdBy: createdBy,
-      memberIds: [...memberIds, createdBy],
-      createdAt: DateTime.now(),
-    );
-    await ref.set(group.toFirestore());
-    return group;
+    try {
+      final res = await _dio.post(
+        '/chats/groups',
+        data: {
+          'workspaceId': workspaceId,
+          'name': name,
+          'memberIds': memberIds,
+        },
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['group'] is Map) {
+        return GroupModel.fromJson(Map<String, dynamic>.from(data['group']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Stream<List<GroupModel>> getGroups(String workspaceId, String userId) => _db
-      .collection(AppConstants.groupsCollection)
-      .where('workspaceId', isEqualTo: workspaceId)
-      .where('memberIds', arrayContains: userId)
-      .snapshots()
-      .map((s) => s.docs.map(GroupModel.fromFirestore).toList());
+  Stream<List<GroupModel>> getGroups(String workspaceId, {Duration pollEvery = const Duration(seconds: 3)}) async* {
+    while (true) {
+      yield await listGroups(workspaceId);
+      await Future<void>.delayed(pollEvery);
+    }
+  }
+
+  Future<List<GroupModel>> listGroups(String workspaceId) async {
+    try {
+      final res = await _dio.get(
+        '/chats/groups',
+        queryParameters: {'workspaceId': workspaceId},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => GroupModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 
   // ─── DMs ─────────────────────────────────────────────────────
   Future<DmModel> getOrCreateDm({
     required String workspaceId,
-    required String userId1,
-    required String userId2,
+    required String otherUserId,
   }) async {
-    final ids = [userId1, userId2]..sort();
-    final query = await _db.collection(AppConstants.dmsCollection)
-        .where('workspaceId', isEqualTo: workspaceId)
-        .where('memberIds', isEqualTo: ids)
-        .limit(1).get();
-    if (query.docs.isNotEmpty) return DmModel.fromFirestore(query.docs.first);
-    final ref = _db.collection(AppConstants.dmsCollection).doc();
-    final dm = DmModel(
-      id: ref.id, workspaceId: workspaceId,
-      memberIds: ids, createdAt: DateTime.now(),
-    );
-    await ref.set(dm.toFirestore());
-    return dm;
+    try {
+      final res = await _dio.post(
+        '/chats/dms',
+        data: {'workspaceId': workspaceId, 'otherUserId': otherUserId},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['dm'] is Map) {
+        return DmModel.fromJson(Map<String, dynamic>.from(data['dm']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Stream<List<DmModel>> getDms(String workspaceId, String userId) => _db
-      .collection(AppConstants.dmsCollection)
-      .where('workspaceId', isEqualTo: workspaceId)
-      .where('memberIds', arrayContains: userId)
-      .orderBy('lastMessageAt', descending: true)
-      .snapshots()
-      .map((s) => s.docs.map(DmModel.fromFirestore).toList());
+  Stream<List<DmModel>> getDms(String workspaceId, {Duration pollEvery = const Duration(seconds: 3)}) async* {
+    while (true) {
+      yield await listDms(workspaceId);
+      await Future<void>.delayed(pollEvery);
+    }
+  }
+
+  Future<List<DmModel>> listDms(String workspaceId) async {
+    try {
+      final res = await _dio.get(
+        '/chats/dms',
+        queryParameters: {'workspaceId': workspaceId},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => DmModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 
   // ─── Messages ────────────────────────────────────────────────
-  String _msgPath(String chatId) => 'chats/$chatId/messages';
+  String _key(String chatType, String chatId) => '$chatType:$chatId';
 
-  Stream<List<MessageModel>> getMessages(String chatId) => _db
-      .collection(_msgPath(chatId))
-      .orderBy('createdAt', descending: true)
-      .limit(50)
-      .snapshots()
-      .map((s) => s.docs.map(MessageModel.fromFirestore).toList());
+  Stream<List<MessageModel>> getMessages({required String chatType, required String chatId}) {
+    final key = _key(chatType, chatId);
+    final existing = _messageControllers[key];
+    if (existing != null) return existing.stream;
+
+    final controller = StreamController<List<MessageModel>>.broadcast();
+    _messageControllers[key] = controller;
+
+    () async {
+      final initial = await listMessages(chatType: chatType, chatId: chatId);
+      _messageCache[key] = initial;
+      if (!controller.isClosed) controller.add(initial);
+
+      _ensureSocketConnected();
+      _socket?.emit('chat:join', {'chatType': chatType, 'chatId': chatId});
+
+      void onNew(dynamic payload) {
+        try {
+          if (payload is! Map) return;
+          final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
+          if (m.chatType != chatType || m.chatId != chatId) return;
+          final cur = _messageCache[key] ?? [];
+          if (cur.any((x) => x.id == m.id)) return;
+          final next = [m, ...cur];
+          _messageCache[key] = next;
+          if (!controller.isClosed) controller.add(next);
+        } catch (_) {}
+      }
+
+      _socket?.on('message:new', onNew);
+
+      void onUpdate(dynamic payload) {
+        try {
+          if (payload is! Map) return;
+          final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
+          if (m.chatType != chatType || m.chatId != chatId) return;
+          final cur = _messageCache[key] ?? [];
+          final idx = cur.indexWhere((x) => x.id == m.id);
+          if (idx < 0) return;
+          final next = [...cur];
+          next[idx] = m;
+          _messageCache[key] = next;
+          if (!controller.isClosed) controller.add(next);
+        } catch (_) {}
+      }
+
+      _socket?.on('message:update', onUpdate);
+
+      controller.onCancel = () {
+        _socket?.emit('chat:leave', {'chatType': chatType, 'chatId': chatId});
+        _socket?.off('message:new', onNew);
+        _socket?.off('message:update', onUpdate);
+        _messageControllers.remove(key);
+        _messageCache.remove(key);
+      };
+    }();
+
+    return controller.stream;
+  }
+
+  Future<List<MessageModel>> listMessages({required String chatType, required String chatId, int limit = 50}) async {
+    try {
+      final res = await _dio.get(
+        '/chats/$chatType/$chatId/messages',
+        queryParameters: {'limit': limit},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => MessageModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 
   Future<MessageModel> sendMessage({
+    required String chatType,
     required String chatId,
-    required String senderId,
     required String senderName,
     String? senderAvatar,
     required String content,
@@ -114,68 +324,233 @@ class ChatRepository {
     String? fileName,
     String? fileSize,
   }) async {
-    final ref = _db.collection(_msgPath(chatId)).doc();
-    final message = MessageModel(
-      id: ref.id, senderId: senderId, senderName: senderName,
-      senderAvatar: senderAvatar, content: content, type: type,
-      fileUrl: fileUrl, fileName: fileName, fileSize: fileSize,
-      createdAt: DateTime.now(),
+    try {
+      final res = await _dio.post(
+        '/chats/$chatType/$chatId/messages',
+        data: {
+          'content': content,
+          'senderName': senderName,
+          'senderAvatar': senderAvatar,
+          'type': type.name,
+          'fileUrl': fileUrl,
+          'fileName': fileName,
+          'fileSize': fileSize,
+        },
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['message'] is Map) {
+        return MessageModel.fromJson(Map<String, dynamic>.from(data['message']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
+  Future<void> markDelivered({required String chatType, required String chatId, required List<String> messageIds}) async {
+    if (messageIds.isEmpty) return;
+    await _dio.post(
+      '/chats/$chatType/$chatId/messages/delivered',
+      data: {'messageIds': messageIds},
+      options: Options(headers: _headers()),
     );
-    await ref.set(message.toFirestore());
-    await _db.doc('chats/$chatId').set({
-      'lastMessage': content, 'lastMessageAt': Timestamp.now(),
-    }, SetOptions(merge: true));
-    return message;
   }
 
-  Future<void> editMessage(String chatId, String messageId, String newContent) async {
-    await _db.collection(_msgPath(chatId)).doc(messageId).update({
-      'content': newContent,
-      'isEdited': true,
-      'editedAt': Timestamp.now(),
-    });
+  Future<void> markRead({required String chatType, required String chatId, required List<String> messageIds}) async {
+    if (messageIds.isEmpty) return;
+    await _dio.post(
+      '/chats/$chatType/$chatId/messages/read',
+      data: {'messageIds': messageIds},
+      options: Options(headers: _headers()),
+    );
   }
 
-  Future<void> deleteMessage(String chatId, String messageId) async {
-    await _db.collection(_msgPath(chatId)).doc(messageId).update({
-      'isDeleted': true,
-      'content': 'This message was deleted',
-    });
+  Future<void> editMessage(String chatId, String messageId, String newContent) async {}
+
+  Future<void> deleteMessage(String chatId, String messageId) async {}
+
+  Future<MessageModel> toggleReaction({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+    required String emoji,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/chats/$chatType/$chatId/messages/$messageId/reactions',
+        data: {'emoji': emoji, 'action': 'toggle'},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['message'] is Map) {
+        return MessageModel.fromJson(Map<String, dynamic>.from(data['message']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
+  Future<MessageModel> forwardMessage({
+    required String sourceChatType,
+    required String sourceChatId,
+    required String messageId,
+    required String targetChatType,
+    required String targetChatId,
+    required String senderName,
+    String? senderAvatar,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/chats/$sourceChatType/$sourceChatId/messages/$messageId/forward',
+        data: {
+          'targetChatType': targetChatType,
+          'targetChatId': targetChatId,
+          'senderName': senderName,
+          'senderAvatar': senderAvatar,
+        },
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['message'] is Map) {
+        return MessageModel.fromJson(Map<String, dynamic>.from(data['message']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
+  Future<List<MessageModel>> searchMessages({
+    required String chatType,
+    required String chatId,
+    required String query,
+    int limit = 30,
+  }) async {
+    try {
+      final res = await _dio.get(
+        '/chats/$chatType/$chatId/messages/search',
+        queryParameters: {'q': query, 'limit': limit},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => MessageModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
   // ─── Threads ─────────────────────────────────────────────────
-  Stream<List<MessageModel>> getThreadMessages(String chatId, String messageId) => _db
-      .collection('chats/$chatId/messages/$messageId/threads')
-      .orderBy('createdAt')
-      .snapshots()
-      .map((s) => s.docs.map(MessageModel.fromFirestore).toList());
+  Stream<List<MessageModel>> getThreadMessages({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+    Duration pollEvery = const Duration(seconds: 3),
+  }) async* {
+    while (true) {
+      yield await listThreadMessages(chatType: chatType, chatId: chatId, messageId: messageId);
+      await Future<void>.delayed(pollEvery);
+    }
+  }
+
+  Future<List<MessageModel>> listThreadMessages({required String chatType, required String chatId, required String messageId}) async {
+    try {
+      final res = await _dio.get(
+        '/chats/$chatType/$chatId/messages/$messageId/threads',
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => MessageModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 
   Future<void> sendThreadMessage({
+    required String chatType,
     required String chatId,
     required String messageId,
     required MessageModel message,
   }) async {
-    final ref = _db
-        .collection('chats/$chatId/messages/$messageId/threads')
-        .doc();
-    await ref.set(message.copyWith().toFirestore());
-    await _db.collection(_msgPath(chatId)).doc(messageId).update({
-      'threadCount': FieldValue.increment(1),
-    });
+    await _dio.post(
+      '/chats/$chatType/$chatId/messages/$messageId/threads',
+      data: {
+        'content': message.content,
+        'senderName': message.senderName,
+        'senderAvatar': message.senderAvatar,
+        'type': message.type.name,
+      },
+      options: Options(headers: _headers()),
+    );
   }
 
   // ─── File Upload ─────────────────────────────────────────────
   Future<String> uploadFile(File file, String chatId) async {
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
-    final ref = _storage.ref('${AppConstants.chatFiles}/$chatId/$fileName');
-    await ref.putFile(file);
-    return await ref.getDownloadURL();
+    final fileName = file.path.split('/').last;
+    final form = FormData.fromMap({
+      'chatId': chatId,
+      'file': await MultipartFile.fromFile(file.path, filename: fileName),
+    });
+
+    final res = await _dio.post(
+      '/uploads/chat-file',
+      data: form,
+      options: Options(
+        headers: {
+          ..._headers(),
+          'Content-Type': 'multipart/form-data',
+        },
+      ),
+    );
+    final data = res.data;
+    if (data is Map && data['url'] != null) return data['url'].toString();
+    throw Exception('Invalid response');
   }
 
   Future<String> uploadImage(File image, String chatId) async {
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final ref = _storage.ref('${AppConstants.chatImages}/$chatId/$fileName');
-    await ref.putFile(image);
-    return await ref.getDownloadURL();
+    final fileName = image.path.split('/').last;
+    final form = FormData.fromMap({
+      'chatId': chatId,
+      'file': await MultipartFile.fromFile(image.path, filename: fileName),
+    });
+
+    final res = await _dio.post(
+      '/uploads/chat-image',
+      data: form,
+      options: Options(
+        headers: {
+          ..._headers(),
+          'Content-Type': 'multipart/form-data',
+        },
+      ),
+    );
+    final data = res.data;
+    if (data is Map && data['url'] != null) return data['url'].toString();
+    throw Exception('Invalid response');
   }
 }

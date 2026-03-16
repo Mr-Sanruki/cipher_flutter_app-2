@@ -1,4 +1,4 @@
-package com.example.cipher
+package com.sanruki.cipher
 
 import io.flutter.embedding.android.FlutterActivity
 

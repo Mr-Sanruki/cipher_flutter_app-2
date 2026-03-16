@@ -7,19 +7,53 @@ import '../../../workspace/presentation/providers/workspace_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/message_model.dart';
 
-class ChannelScreen extends ConsumerWidget {
+class ChannelScreen extends ConsumerStatefulWidget {
   final String channelId;
   const ChannelScreen({super.key, required this.channelId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final messagesAsync = ref.watch(messagesProvider(channelId));
+  ConsumerState<ChannelScreen> createState() => _ChannelScreenState();
+}
+
+class _ChannelScreenState extends ConsumerState<ChannelScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    final target = (chatType: 'channel', chatId: widget.channelId);
+    ref.listen<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
+      final myId = ref.read(backendUserIdProvider);
+      if (myId == null) return;
+
+      next.whenData((messages) {
+        final toDeliver = <String>[];
+        final toRead = <String>[];
+
+        for (final m in messages) {
+          if (m.senderId == myId) continue;
+          if (!m.deliveredTo.containsKey(myId)) toDeliver.add(m.id);
+          if (!m.readBy.containsKey(myId)) toRead.add(m.id);
+        }
+
+        if (toDeliver.isNotEmpty) {
+          ref.read(messageNotifierProvider.notifier).markDelivered(chatType: 'channel', chatId: widget.channelId, messageIds: toDeliver);
+        }
+        if (toRead.isNotEmpty) {
+          ref.read(messageNotifierProvider.notifier).markRead(chatType: 'channel', chatId: widget.channelId, messageIds: toRead);
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messagesAsync = ref.watch(messagesProvider((chatType: 'channel', chatId: widget.channelId)));
     final workspace = ref.watch(selectedWorkspaceProvider);
-    final user = ref.watch(authStateProvider).value;
-    final isAdmin = workspace?.isAdmin(user?.uid ?? '') ?? false;
+    final myId = ref.watch(backendUserIdProvider);
+    final isAdmin = workspace?.isAdmin(myId ?? '') ?? false;
     final channelsAsync = ref.watch(channelsProvider);
     final channel = channelsAsync.value?.firstWhere(
-      (c) => c.id == channelId,
+      (c) => c.id == widget.channelId,
       orElse: () => channelsAsync.value!.first,
     );
 
@@ -35,6 +69,14 @@ class ChannelScreen extends ConsumerWidget {
                   style: TextStyle(fontSize: 11, color: Colors.orange)),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search_outlined),
+            onPressed: () {
+              Navigator.of(context).pushNamed('/chat-search/channel/${widget.channelId}');
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -49,7 +91,8 @@ class ChannelScreen extends ConsumerWidget {
                       itemCount: messages.length,
                       itemBuilder: (_, i) => MessageBubble(
                         message: messages[i],
-                        chatId: channelId,
+                        chatType: 'channel',
+                        chatId: widget.channelId,
                       ),
                     ),
             ),
@@ -58,11 +101,12 @@ class ChannelScreen extends ConsumerWidget {
             readOnly: !isAdmin,
             readOnlyMessage: 'Only admins can post in this channel',
             onSendText: (text) => ref.read(messageNotifierProvider.notifier).sendMessage(
-              chatId: channelId,
+              chatType: 'channel',
+              chatId: widget.channelId,
               content: text,
               type: MessageType.text,
             ),
-            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendFile(channelId, file),
+            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendFile(chatType: 'channel', chatId: widget.channelId, file: file),
           ),
         ],
       ),

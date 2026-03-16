@@ -27,7 +27,7 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
   Future<void> _initCall() async {
     try {
       final streamVideo = ref.read(streamVideoProvider);
-      _call = streamVideo.makeCall(callType: StreamCallType(), id: widget.callId);
+      _call = streamVideo.makeCall(callType: StreamCallType.defaultType(), id: widget.callId);
       await _call!.getOrCreate();
       await _call!.join();
       setState(() {

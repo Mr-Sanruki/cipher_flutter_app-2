@@ -12,28 +12,31 @@ class OtpScreen extends ConsumerStatefulWidget {
 }
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
-  final _linkController = TextEditingController();
+  final _codeController = TextEditingController();
+  bool _submitting = false;
 
   @override
   void dispose() {
-    _linkController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
   Future<void> _verify() async {
-    final link = _linkController.text.trim();
-    if (link.isEmpty) return;
-    await ref
-        .read(authNotifierProvider.notifier)
-        .signInWithLink(widget.email, link);
+    if (_submitting) return;
+    final code = _codeController.text.trim();
+    if (code.isEmpty) return;
+    setState(() => _submitting = true);
+    await ref.read(authNotifierProvider.notifier).verifyOtp(email: widget.email, code: code);
     if (!mounted) return;
     final state = ref.read(authNotifierProvider);
     if (state is! AsyncError) {
       context.go('/workspace');
     } else {
+      final err = state.error;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid link. Please try again.')),
+        SnackBar(content: Text('Error: $err')),
       );
+      setState(() => _submitting = false);
     }
   }
 
@@ -41,7 +44,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     await ref.read(authNotifierProvider.notifier).sendOtp(widget.email);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Login link resent!')),
+      const SnackBar(content: Text('Login code resent!')),
     );
   }
 
@@ -63,20 +66,21 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       fontWeight: FontWeight.bold,
                     )),
             const SizedBox(height: 8),
-            Text('We sent a login link to ${widget.email}. Paste the full link below.',
+            Text('We sent a 6-digit login code to ${widget.email}. Enter it below.',
                 style: TextStyle(color: Colors.grey[600])),
             const SizedBox(height: 32),
             TextField(
-              controller: _linkController,
+              controller: _codeController,
               decoration: const InputDecoration(
-                labelText: 'Paste login link here',
-                prefixIcon: Icon(Icons.link_rounded),
+                labelText: '6-digit code',
+                prefixIcon: Icon(Icons.lock_outline_rounded),
               ),
-              maxLines: 3,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: authState.isLoading ? null : _verify,
+              onPressed: (authState.isLoading || _submitting) ? null : _verify,
               child: authState.isLoading
                   ? const SizedBox(
                       height: 20,

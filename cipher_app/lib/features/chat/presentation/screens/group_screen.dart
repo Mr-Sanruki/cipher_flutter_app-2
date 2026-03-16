@@ -5,17 +5,52 @@ import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
 import '../../data/models/message_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-class GroupScreen extends ConsumerWidget {
+class GroupScreen extends ConsumerStatefulWidget {
   final String groupId;
   const GroupScreen({super.key, required this.groupId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final messagesAsync = ref.watch(messagesProvider(groupId));
+  ConsumerState<GroupScreen> createState() => _GroupScreenState();
+}
+
+class _GroupScreenState extends ConsumerState<GroupScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    final target = (chatType: 'group', chatId: widget.groupId);
+    ref.listen<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
+      final myId = ref.read(backendUserIdProvider);
+      if (myId == null) return;
+
+      next.whenData((messages) {
+        final toDeliver = <String>[];
+        final toRead = <String>[];
+
+        for (final m in messages) {
+          if (m.senderId == myId) continue;
+          if (!m.deliveredTo.containsKey(myId)) toDeliver.add(m.id);
+          if (!m.readBy.containsKey(myId)) toRead.add(m.id);
+        }
+
+        if (toDeliver.isNotEmpty) {
+          ref.read(messageNotifierProvider.notifier).markDelivered(chatType: 'group', chatId: widget.groupId, messageIds: toDeliver);
+        }
+        if (toRead.isNotEmpty) {
+          ref.read(messageNotifierProvider.notifier).markRead(chatType: 'group', chatId: widget.groupId, messageIds: toRead);
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messagesAsync = ref.watch(messagesProvider((chatType: 'group', chatId: widget.groupId)));
     final groupsAsync = ref.watch(groupsProvider);
     final group = groupsAsync.value?.firstWhere(
-      (g) => g.id == groupId,
+      (g) => g.id == widget.groupId,
       orElse: () => groupsAsync.value!.first,
     );
 
@@ -46,8 +81,14 @@ class GroupScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search_outlined),
+            onPressed: () {
+              Navigator.of(context).pushNamed('/chat-search/group/${widget.groupId}');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.call_outlined),
-            onPressed: () => context.push('/call/$groupId'),
+            onPressed: () => context.push('/call/${widget.groupId}'),
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -66,17 +107,18 @@ class GroupScreen extends ConsumerWidget {
                   : ListView.builder(
                       reverse: true,
                       itemCount: messages.length,
-                      itemBuilder: (_, i) => MessageBubble(message: messages[i], chatId: groupId),
+                      itemBuilder: (_, i) => MessageBubble(message: messages[i], chatType: 'group', chatId: widget.groupId),
                     ),
             ),
           ),
           MessageInputBar(
             onSendText: (text) => ref.read(messageNotifierProvider.notifier).sendMessage(
-              chatId: groupId,
+              chatType: 'group',
+              chatId: widget.groupId,
               content: text,
               type: MessageType.text,
             ),
-            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendFile(groupId, file),
+            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendFile(chatType: 'group', chatId: widget.groupId, file: file),
           ),
         ],
       ),

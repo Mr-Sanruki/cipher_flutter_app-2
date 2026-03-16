@@ -1,90 +1,159 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../models/workspace_model.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../auth/data/repositories/auth_repository.dart';
 
-final workspaceRepositoryProvider = Provider<WorkspaceRepository>((ref) => WorkspaceRepository());
+final workspaceRepositoryProvider = Provider<WorkspaceRepository>((ref) {
+  return WorkspaceRepository(ref.watch(authRepositoryProvider));
+});
 
 class WorkspaceRepository {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final _uuid = const Uuid();
+  final AuthRepository _authRepo;
+  final Dio _dio;
+
+  WorkspaceRepository(this._authRepo)
+      : _dio = Dio(BaseOptions(
+          baseUrl: AppConstants.backendBaseUrl,
+          connectTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {'Content-Type': 'application/json'},
+        ));
+
+  Map<String, String> _headers() {
+    final token = _authRepo.getSavedToken();
+    if (token == null) throw Exception('UNAUTHORIZED');
+    return {'Authorization': 'Bearer $token'};
+  }
 
   Future<WorkspaceModel> createWorkspace({
     required String name,
-    required String ownerId,
     String? description,
   }) async {
-    final inviteCode = _uuid.v4().substring(0, 8).toUpperCase();
-    final ref = _db.collection(AppConstants.workspacesCollection).doc();
-    final workspace = WorkspaceModel(
-      id: ref.id,
-      name: name,
-      description: description,
-      ownerId: ownerId,
-      memberIds: [ownerId],
-      adminIds: [ownerId],
-      inviteCode: inviteCode,
-      createdAt: DateTime.now(),
-    );
-    await ref.set(workspace.toFirestore());
-    await _db.collection(AppConstants.usersCollection).doc(ownerId).update({
-      'workspaceIds': FieldValue.arrayUnion([ref.id]),
-    });
-    return workspace;
+    try {
+      final res = await _dio.post(
+        '/workspaces',
+        data: {'name': name, 'description': description},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['workspace'] is Map) {
+        return WorkspaceModel.fromJson(Map<String, dynamic>.from(data['workspace']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Future<WorkspaceModel?> joinByInviteCode(String code, String userId) async {
-    final query = await _db
-        .collection(AppConstants.workspacesCollection)
-        .where('inviteCode', isEqualTo: code.toUpperCase())
-        .limit(1)
-        .get();
-    if (query.docs.isEmpty) return null;
-    final doc = query.docs.first;
-    await doc.reference.update({
-      'memberIds': FieldValue.arrayUnion([userId]),
-    });
-    await _db.collection(AppConstants.usersCollection).doc(userId).update({
-      'workspaceIds': FieldValue.arrayUnion([doc.id]),
-    });
-    return WorkspaceModel.fromFirestore(doc);
+  Future<WorkspaceModel?> joinByInviteCode(String code) async {
+    try {
+      final res = await _dio.post(
+        '/workspaces/join',
+        data: {'code': code},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['workspace'] is Map) {
+        return WorkspaceModel.fromJson(Map<String, dynamic>.from(data['workspace']));
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Stream<List<WorkspaceModel>> getUserWorkspaces(String userId) {
-    return _db
-        .collection(AppConstants.workspacesCollection)
-        .where('memberIds', arrayContains: userId)
-        .snapshots()
-        .map((s) => s.docs.map(WorkspaceModel.fromFirestore).toList());
+  Stream<List<WorkspaceModel>> watchMyWorkspaces({Duration pollEvery = const Duration(seconds: 3)}) async* {
+    while (true) {
+      yield await listMyWorkspaces();
+      await Future<void>.delayed(pollEvery);
+    }
   }
 
-  Future<WorkspaceModel?> getWorkspace(String id) async {
-    final doc = await _db.collection(AppConstants.workspacesCollection).doc(id).get();
-    if (!doc.exists) return null;
-    return WorkspaceModel.fromFirestore(doc);
+  Future<List<WorkspaceModel>> listMyWorkspaces() async {
+    try {
+      final res = await _dio.get(
+        '/workspaces',
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      final items = (data is Map ? data['items'] : null);
+      if (items is List) {
+        return items
+            .whereType<Map>()
+            .map((m) => WorkspaceModel.fromJson(Map<String, dynamic>.from(m)))
+            .toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Future<void> updateWorkspace(WorkspaceModel workspace) async {
-    await _db
-        .collection(AppConstants.workspacesCollection)
-        .doc(workspace.id)
-        .update(workspace.toFirestore());
+  Future<void> leaveWorkspace(String workspaceId) async {
+    try {
+      await _dio.post(
+        '/workspaces/$workspaceId/leave',
+        options: Options(headers: _headers()),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Future<void> leaveWorkspace(String workspaceId, String userId) async {
-    await _db.collection(AppConstants.workspacesCollection).doc(workspaceId).update({
-      'memberIds': FieldValue.arrayRemove([userId]),
-      'adminIds': FieldValue.arrayRemove([userId]),
-    });
-    await _db.collection(AppConstants.usersCollection).doc(userId).update({
-      'workspaceIds': FieldValue.arrayRemove([workspaceId]),
-    });
+  Future<WorkspaceModel> updateWorkspace(WorkspaceModel workspace) async {
+    try {
+      final res = await _dio.put(
+        '/workspaces/${workspace.id}',
+        data: {
+          'name': workspace.name,
+          'description': workspace.description,
+          'iconUrl': workspace.iconUrl,
+        },
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['workspace'] is Map) {
+        return WorkspaceModel.fromJson(Map<String, dynamic>.from(data['workspace']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 
-  Future<void> makeAdmin(String workspaceId, String userId) async {
-    await _db.collection(AppConstants.workspacesCollection).doc(workspaceId).update({
-      'adminIds': FieldValue.arrayUnion([userId]),
-    });
+  Future<WorkspaceModel> setMemberRole({
+    required String workspaceId,
+    required String memberId,
+    required String role,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/workspaces/$workspaceId/roles',
+        data: {'memberId': memberId, 'role': role},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['workspace'] is Map) {
+        return WorkspaceModel.fromJson(Map<String, dynamic>.from(data['workspace']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
   }
 }

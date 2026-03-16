@@ -7,17 +7,51 @@ import '../widgets/message_input_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/message_model.dart';
 
-class DmScreen extends ConsumerWidget {
+class DmScreen extends ConsumerStatefulWidget {
   final String dmId;
   const DmScreen({super.key, required this.dmId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final messagesAsync = ref.watch(messagesProvider(dmId));
+  ConsumerState<DmScreen> createState() => _DmScreenState();
+}
+
+class _DmScreenState extends ConsumerState<DmScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    final target = (chatType: 'dm', chatId: widget.dmId);
+    ref.listen<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
+      final myId = ref.read(backendUserIdProvider);
+      if (myId == null) return;
+
+      next.whenData((messages) {
+        final toDeliver = <String>[];
+        final toRead = <String>[];
+
+        for (final m in messages) {
+          if (m.senderId == myId) continue;
+          if (!m.deliveredTo.containsKey(myId)) toDeliver.add(m.id);
+          if (!m.readBy.containsKey(myId)) toRead.add(m.id);
+        }
+
+        if (toDeliver.isNotEmpty) {
+          ref.read(messageNotifierProvider.notifier).markDelivered(chatType: 'dm', chatId: widget.dmId, messageIds: toDeliver);
+        }
+        if (toRead.isNotEmpty) {
+          ref.read(messageNotifierProvider.notifier).markRead(chatType: 'dm', chatId: widget.dmId, messageIds: toRead);
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messagesAsync = ref.watch(messagesProvider((chatType: 'dm', chatId: widget.dmId)));
     final dmsAsync = ref.watch(dmsProvider);
-    final user = ref.watch(authStateProvider).value;
-    final dm = dmsAsync.value?.firstWhere((d) => d.id == dmId, orElse: () => dmsAsync.value!.first);
-    final otherId = dm?.otherUserId(user?.uid ?? '') ?? 'User';
+    final myId = ref.watch(backendUserIdProvider);
+    final dm = dmsAsync.value?.firstWhere((d) => d.id == widget.dmId, orElse: () => dmsAsync.value!.first);
+    final otherId = dm != null && myId != null ? dm.otherUserId(myId) : 'User';
 
     return Scaffold(
       appBar: AppBar(
@@ -34,8 +68,14 @@ class DmScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search_outlined),
+            onPressed: () {
+              Navigator.of(context).pushNamed('/chat-search/dm/${widget.dmId}');
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.call_outlined),
-            onPressed: () => context.push('/call/$dmId'),
+            onPressed: () => context.push('/call/${widget.dmId}'),
             tooltip: 'Voice call',
           ),
         ],
@@ -51,17 +91,18 @@ class DmScreen extends ConsumerWidget {
                   : ListView.builder(
                       reverse: true,
                       itemCount: messages.length,
-                      itemBuilder: (_, i) => MessageBubble(message: messages[i], chatId: dmId),
+                      itemBuilder: (_, i) => MessageBubble(message: messages[i], chatType: 'dm', chatId: widget.dmId),
                     ),
             ),
           ),
           MessageInputBar(
             onSendText: (text) => ref.read(messageNotifierProvider.notifier).sendMessage(
-              chatId: dmId,
+              chatType: 'dm',
+              chatId: widget.dmId,
               content: text,
               type: MessageType.text,
             ),
-            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendFile(dmId, file),
+            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendFile(chatType: 'dm', chatId: widget.dmId, file: file),
           ),
         ],
       ),

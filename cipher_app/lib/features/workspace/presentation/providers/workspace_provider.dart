@@ -1,14 +1,70 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../data/models/workspace_model.dart';
 import '../../data/repositories/workspace_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
-final selectedWorkspaceProvider = StateProvider<WorkspaceModel?>((ref) => null);
+const _selectedWorkspaceIdKey = 'selected_workspace_id';
+
+final selectedWorkspaceProvider = StateNotifierProvider<SelectedWorkspaceNotifier, WorkspaceModel?>((ref) {
+  return SelectedWorkspaceNotifier(ref);
+});
+
+class SelectedWorkspaceNotifier extends StateNotifier<WorkspaceModel?> {
+  final Ref _ref;
+  late final Box _box;
+
+  SelectedWorkspaceNotifier(this._ref) : super(null) {
+    _box = Hive.box(AppConstants.settingsBox);
+
+    _ref.listen<AsyncValue<List<WorkspaceModel>>>(userWorkspacesProvider, (prev, next) {
+      next.whenData((workspaces) {
+        if (workspaces.isEmpty) {
+          clear();
+          return;
+        }
+
+        final storedId = _box.get(_selectedWorkspaceIdKey) as String?;
+        if (storedId != null) {
+          final stored = workspaces.where((w) => w.id == storedId).cast<WorkspaceModel?>().firstWhere(
+                (w) => w != null,
+                orElse: () => null,
+              );
+          if (stored != null) {
+            if (state?.id != stored.id) state = stored;
+            return;
+          }
+        }
+
+        if (state == null || !workspaces.any((w) => w.id == state!.id)) {
+          setWorkspace(workspaces.first);
+        }
+      });
+    });
+
+    _ref.listen(authStateProvider, (prev, next) {
+      if (next == false) {
+        clear();
+      }
+    });
+  }
+
+  void setWorkspace(WorkspaceModel workspace) {
+    state = workspace;
+    _box.put(_selectedWorkspaceIdKey, workspace.id);
+  }
+
+  void clear() {
+    state = null;
+    _box.delete(_selectedWorkspaceIdKey);
+  }
+}
 
 final userWorkspacesProvider = StreamProvider<List<WorkspaceModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return const Stream.empty();
-  return ref.watch(workspaceRepositoryProvider).getUserWorkspaces(user.uid);
+  final token = ref.watch(authTokenProvider);
+  if (token == null) return const Stream.empty();
+  return ref.watch(workspaceRepositoryProvider).watchMyWorkspaces();
 });
 
 final workspaceNotifierProvider =
@@ -25,13 +81,13 @@ class WorkspaceNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     WorkspaceModel? workspace;
     state = await AsyncValue.guard(() async {
-      final userId = _ref.read(authStateProvider).value!.uid;
       workspace = await _repo.createWorkspace(
         name: name,
-        ownerId: userId,
         description: description,
       );
-      _ref.read(selectedWorkspaceProvider.notifier).state = workspace;
+      if (workspace != null) {
+        _ref.read(selectedWorkspaceProvider.notifier).setWorkspace(workspace!);
+      }
     });
     return workspace;
   }
@@ -40,10 +96,9 @@ class WorkspaceNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     WorkspaceModel? workspace;
     state = await AsyncValue.guard(() async {
-      final userId = _ref.read(authStateProvider).value!.uid;
-      workspace = await _repo.joinByInviteCode(code, userId);
+      workspace = await _repo.joinByInviteCode(code);
       if (workspace != null) {
-        _ref.read(selectedWorkspaceProvider.notifier).state = workspace;
+        _ref.read(selectedWorkspaceProvider.notifier).setWorkspace(workspace!);
       }
     });
     return workspace;
@@ -52,9 +107,8 @@ class WorkspaceNotifier extends StateNotifier<AsyncValue<void>> {
   Future<void> leaveWorkspace(String workspaceId) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final userId = _ref.read(authStateProvider).value!.uid;
-      await _repo.leaveWorkspace(workspaceId, userId);
-      _ref.read(selectedWorkspaceProvider.notifier).state = null;
+      await _repo.leaveWorkspace(workspaceId);
+      _ref.read(selectedWorkspaceProvider.notifier).clear();
     });
   }
 }

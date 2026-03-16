@@ -28,8 +28,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void _navigate() async {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
-    final user = ref.read(authStateProvider).value;
-    if (user != null) {
+    final token = ref.read(authTokenProvider);
+    if (token != null) {
       context.go('/home');
     } else {
       context.go('/auth/login');

@@ -30,7 +30,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       context.push('/auth/otp', extra: _emailController.text.trim());
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${(state as AsyncError).error}')),
+        SnackBar(content: Text('Error: ${state.error}')),
       );
     }
   }
@@ -85,12 +85,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text('Send OTP'),
+                      : const Text('Send Code'),
                 ),
                 const Spacer(),
                 Center(
                   child: Text(
-                    'We\'ll send a login link to your email',
+                    'We\'ll send a 6-digit login code to your email',
                     style: TextStyle(color: Colors.grey[500], fontSize: 13),
                   ),
                 ),

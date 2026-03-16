@@ -43,9 +43,12 @@ class _WorkspaceSettingsScreenState extends ConsumerState<WorkspaceSettingsScree
         description: _descCtrl.text.trim(),
       );
       await ref.read(workspaceRepositoryProvider).updateWorkspace(updated);
-      ref.read(selectedWorkspaceProvider.notifier).state = updated;
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Workspace updated!')));
+      ref.read(selectedWorkspaceProvider.notifier).setWorkspace(updated);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Workspace updated!')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -54,8 +57,8 @@ class _WorkspaceSettingsScreenState extends ConsumerState<WorkspaceSettingsScree
   @override
   Widget build(BuildContext context) {
     final ws = ref.watch(selectedWorkspaceProvider);
-    final user = ref.watch(authStateProvider).value;
-    final isOwner = ws?.ownerId == user?.uid;
+    final backendUserId = ref.watch(backendUserIdProvider);
+    final isOwner = ws?.ownerId == backendUserId;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,7 +78,7 @@ class _WorkspaceSettingsScreenState extends ConsumerState<WorkspaceSettingsScree
               children: [
                 // Invite Code Card
                 Card(
-                  color: const Color(0xFF6C63FF).withOpacity(0.05),
+                  color: const Color(0xFF6C63FF).withAlpha(13),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -117,6 +120,17 @@ class _WorkspaceSettingsScreenState extends ConsumerState<WorkspaceSettingsScree
                   ],
                 ),
                 const SizedBox(height: 24),
+
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.groups_outlined),
+                    title: const Text('Member Directory'),
+                    subtitle: const Text('View members and roles'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () => context.push('/settings/members'),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                 if (isOwner) ...[
                   TextField(

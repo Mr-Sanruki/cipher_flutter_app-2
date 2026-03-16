@@ -1,11 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
-import '../../../../core/constants/app_constants.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -60,13 +57,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final user = ref.read(currentUserProvider).value;
       if (user == null) return;
-      final ref2 = FirebaseStorage.instance
-          .ref('${AppConstants.profileImages}/${user.id}.jpg');
-      await ref2.putFile(File(image.path));
-      final url = await ref2.getDownloadURL();
+      final url = await ref.read(authRepositoryProvider).uploadAvatar(image.path);
       await ref.read(authRepositoryProvider).updateUser(user.copyWith(avatarUrl: url));
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avatar updated!')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Avatar updated!')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

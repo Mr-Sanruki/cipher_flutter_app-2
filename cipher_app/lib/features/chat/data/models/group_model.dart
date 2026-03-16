@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
 class GroupModel extends Equatable {
@@ -20,26 +19,32 @@ class GroupModel extends Equatable {
     required this.createdAt,
   });
 
-  factory GroupModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory GroupModel.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic v) {
+      if (v is String) return DateTime.parse(v);
+      if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
     return GroupModel(
-      id: doc.id,
-      workspaceId: data['workspaceId'] ?? '',
-      name: data['name'] ?? '',
-      iconUrl: data['iconUrl'],
-      createdBy: data['createdBy'] ?? '',
-      memberIds: List<String>.from(data['memberIds'] ?? []),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      id: (json['id'] ?? '').toString(),
+      workspaceId: (json['workspaceId'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      iconUrl: json['iconUrl']?.toString(),
+      createdBy: (json['createdBy'] ?? '').toString(),
+      memberIds: (json['memberIds'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      createdAt: parseDate(json['createdAt']),
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
+  Map<String, dynamic> toJson() => {
+    'id': id,
     'workspaceId': workspaceId,
     'name': name,
     'iconUrl': iconUrl,
     'createdBy': createdBy,
     'memberIds': memberIds,
-    'createdAt': Timestamp.fromDate(createdAt),
+    'createdAt': createdAt.toUtc().toIso8601String(),
   };
 
   @override

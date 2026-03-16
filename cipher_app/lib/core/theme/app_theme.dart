@@ -11,7 +11,6 @@ class AppTheme {
       seedColor: primaryColor,
       brightness: Brightness.light,
     ),
-    fontFamily: 'Inter',
     appBarTheme: const AppBarTheme(
       elevation: 0,
       centerTitle: true,
@@ -53,7 +52,6 @@ class AppTheme {
       seedColor: primaryColor,
       brightness: Brightness.dark,
     ),
-    fontFamily: 'Inter',
     appBarTheme: const AppBarTheme(
       elevation: 0,
       centerTitle: true,

@@ -12,17 +12,24 @@ class GroqMessage {
 }
 
 class GroqService {
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: AppConstants.groqBaseUrl,
-    headers: {
-      'Authorization': 'Bearer ${AppConstants.groqApiKey}',
-      'Content-Type': 'application/json',
-    },
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 60),
-  ));
+  late final Dio _dio;
+
+  GroqService() {
+    _dio = Dio(BaseOptions(
+      baseUrl: AppConstants.groqBaseUrl,
+      headers: {
+        if (AppConstants.groqApiKey.isNotEmpty) 'Authorization': 'Bearer ${AppConstants.groqApiKey}',
+        'Content-Type': 'application/json',
+      },
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
+    ));
+  }
 
   Future<String> chat(List<GroqMessage> messages) async {
+    if (AppConstants.groqApiKey.isEmpty) {
+      throw Exception('Missing GROQ_API_KEY. Run with --dart-define=GROQ_API_KEY=...');
+    }
     final response = await _dio.post('/chat/completions', data: {
       'model': AppConstants.groqModel,
       'messages': messages.map((m) => m.toJson()).toList(),

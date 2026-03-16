@@ -15,6 +15,95 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
 
+  void _showWorkspaceSwitcher() {
+    final workspacesAsync = ref.read(userWorkspacesProvider);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Switch workspace',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                workspacesAsync.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (e, _) => Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(child: Text('Error: $e')),
+                  ),
+                  data: (workspaces) {
+                    final selected = ref.read(selectedWorkspaceProvider);
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: workspaces.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (ctx, i) {
+                        final ws = workspaces[i];
+                        final isSelected = selected?.id == ws.id;
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF6C63FF),
+                            child: Text(
+                              ws.name.isNotEmpty ? ws.name[0].toUpperCase() : '?',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          title: Text(ws.name, overflow: TextOverflow.ellipsis),
+                          subtitle: Text('${ws.memberIds.length} members'),
+                          trailing: isSelected ? const Icon(Icons.check, color: Color(0xFF6C63FF)) : null,
+                          onTap: () {
+                            ref.read(selectedWorkspaceProvider.notifier).setWorkspace(ws);
+                            Navigator.pop(ctx);
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          context.push('/workspace');
+                        },
+                        icon: const Icon(Icons.workspaces_outlined),
+                        label: const Text('Manage workspaces'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final workspace = ref.watch(selectedWorkspaceProvider);
@@ -25,21 +114,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: const Color(0xFF6C63FF),
-              radius: 16,
-              child: Text(workspace.name[0].toUpperCase(),
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+        title: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _showWorkspaceSwitcher,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF6C63FF),
+                  radius: 16,
+                  child: Text(workspace.name[0].toUpperCase(),
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(workspace.name,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                const Icon(Icons.keyboard_arrow_down),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(workspace.name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ],
+          ),
         ),
         actions: [
           IconButton(
@@ -82,8 +179,8 @@ class _ChannelsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final channelsAsync = ref.watch(channelsProvider);
     final workspace = ref.watch(selectedWorkspaceProvider);
-    final user = ref.watch(authStateProvider).value;
-    final isAdmin = workspace?.isAdmin(user?.uid ?? '') ?? false;
+    final myId = ref.watch(backendUserIdProvider);
+    final isAdmin = workspace?.isAdmin(myId ?? '') ?? false;
 
     return Scaffold(
       body: channelsAsync.when(
@@ -117,6 +214,7 @@ class _ChannelsTab extends ConsumerWidget {
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
+              heroTag: 'home_channels_fab',
               onPressed: () => _showCreateChannel(context, ref),
               child: const Icon(Icons.add),
             )
@@ -183,8 +281,8 @@ class _DmsTab extends ConsumerWidget {
               itemCount: dms.length,
               itemBuilder: (context, i) {
                 final dm = dms[i];
-                final user = ref.read(authStateProvider).value;
-                final otherId = dm.otherUserId(user?.uid ?? '');
+                final myId = ref.read(backendUserIdProvider);
+                final otherId = myId != null ? dm.otherUserId(myId) : 'User';
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: Colors.blue.shade100,
@@ -235,6 +333,7 @@ class _GroupsTab extends ConsumerWidget {
               ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'home_groups_fab',
         onPressed: () => _showCreateGroup(context, ref),
         child: const Icon(Icons.group_add),
       ),
@@ -262,9 +361,9 @@ class _GroupsTab extends ConsumerWidget {
             ElevatedButton(
               onPressed: () async {
                 if (nameCtrl.text.isEmpty) return;
-                final user = ref.read(authStateProvider).value;
+                final myId = ref.read(backendUserIdProvider);
                 await ref.read(chatSetupNotifierProvider.notifier)
-                    .createGroup(nameCtrl.text.trim(), [user?.uid ?? '']);
+                    .createGroup(nameCtrl.text.trim(), [myId ?? '']);
                 if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('Create Group'),

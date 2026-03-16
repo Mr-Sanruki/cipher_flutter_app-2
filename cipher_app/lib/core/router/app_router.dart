@@ -13,19 +13,21 @@ import '../../features/chat/presentation/screens/channel_screen.dart';
 import '../../features/chat/presentation/screens/dm_screen.dart';
 import '../../features/chat/presentation/screens/group_screen.dart';
 import '../../features/chat/presentation/screens/thread_screen.dart';
+import '../../features/chat/presentation/screens/message_search_screen.dart';
 import '../../features/ai/presentation/screens/ai_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/profile_screen.dart';
 import '../../features/settings/presentation/screens/account_screen.dart';
 import '../../features/settings/presentation/screens/workspace_settings_screen.dart';
 import '../../features/calls/presentation/screens/voice_call_screen.dart';
+import '../../features/workspace/presentation/screens/members_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  final token = ref.watch(authTokenProvider);
   return GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) {
-      final isLoggedIn = authState.value != null;
+      final isLoggedIn = token != null;
       final isAuthRoute = state.matchedLocation.startsWith('/auth') ||
           state.matchedLocation == '/splash';
       if (!isLoggedIn && !isAuthRoute) return '/auth/login';
@@ -59,11 +61,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/thread/:id',
         builder: (c, s) => ThreadScreen(messageId: s.pathParameters['id']!),
       ),
+      GoRoute(
+        path: '/chat-search/:type/:id',
+        builder: (c, s) => MessageSearchScreen(
+          chatType: s.pathParameters['type']!,
+          chatId: s.pathParameters['id']!,
+        ),
+      ),
       GoRoute(path: '/ai', builder: (c, s) => const AiScreen()),
       GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
       GoRoute(path: '/settings/profile', builder: (c, s) => const ProfileScreen()),
       GoRoute(path: '/settings/account', builder: (c, s) => const AccountScreen()),
       GoRoute(path: '/settings/workspace', builder: (c, s) => const WorkspaceSettingsScreen()),
+      GoRoute(path: '/settings/members', builder: (c, s) => const MembersScreen()),
       GoRoute(
         path: '/call/:id',
         builder: (c, s) => VoiceCallScreen(callId: s.pathParameters['id']!),

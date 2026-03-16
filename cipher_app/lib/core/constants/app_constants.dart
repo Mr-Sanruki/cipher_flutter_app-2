@@ -1,9 +1,12 @@
 class AppConstants {
   static const String appName = 'Cipher';
   static const String groqBaseUrl = 'https://api.groq.com/openai/v1';
-  static const String groqApiKey = 'YOUR_GROQ_API_KEY'; // Replace with your key
+  static const String groqApiKey = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
   static const String groqModel = 'llama3-8b-8192';
-  static const String streamApiKey = 'YOUR_STREAM_API_KEY'; // Replace with your key
+  static const String streamApiKey = 'z3qps2tk4aes'; // Replace with your key
+
+  static const String backendBaseUrl =
+      String.fromEnvironment('BACKEND_BASE_URL', defaultValue: 'http://localhost:8080');
 
   // Firestore Collections
   static const String usersCollection = 'users';

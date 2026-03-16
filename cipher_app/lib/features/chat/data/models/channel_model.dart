@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
 class ChannelModel extends Equatable {
@@ -20,26 +19,32 @@ class ChannelModel extends Equatable {
     required this.createdAt,
   });
 
-  factory ChannelModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory ChannelModel.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic v) {
+      if (v is String) return DateTime.parse(v);
+      if (v is int) return DateTime.fromMillisecondsSinceEpoch(v);
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
     return ChannelModel(
-      id: doc.id,
-      workspaceId: data['workspaceId'] ?? '',
-      name: data['name'] ?? '',
-      description: data['description'],
-      createdBy: data['createdBy'] ?? '',
-      isAnnouncement: data['isAnnouncement'] ?? false,
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      id: (json['id'] ?? '').toString(),
+      workspaceId: (json['workspaceId'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      description: json['description']?.toString(),
+      createdBy: (json['createdBy'] ?? '').toString(),
+      isAnnouncement: json['isAnnouncement'] == true,
+      createdAt: parseDate(json['createdAt']),
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
+  Map<String, dynamic> toJson() => {
+    'id': id,
     'workspaceId': workspaceId,
     'name': name,
     'description': description,
     'createdBy': createdBy,
     'isAnnouncement': isAnnouncement,
-    'createdAt': Timestamp.fromDate(createdAt),
+    'createdAt': createdAt.toUtc().toIso8601String(),
   };
 
   @override

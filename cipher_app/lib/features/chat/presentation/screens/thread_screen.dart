@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
@@ -11,10 +12,12 @@ class ThreadScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final args = ModalRoute.of(context)?.settings.arguments as Map?;
+    final extra = GoRouterState.of(context).extra;
+    final args = extra is Map ? extra : null;
     final chatId = args?['chatId'] as String? ?? '';
+    final chatType = args?['chatType'] as String? ?? '';
     final parentMessage = args?['message'] as MessageModel?;
-    final threadArgs = (chatId: chatId, messageId: messageId);
+    final threadArgs = (chatType: chatType, chatId: chatId, messageId: messageId);
     final threadsAsync = ref.watch(threadMessagesProvider(threadArgs));
 
     return Scaffold(
@@ -33,7 +36,7 @@ class ThreadScreen extends ConsumerWidget {
           if (parentMessage != null) ...[
             Container(
               color: Colors.grey[50],
-              child: MessageBubble(message: parentMessage, chatId: chatId, showSender: true),
+              child: MessageBubble(message: parentMessage, chatType: chatType, chatId: chatId, showSender: true),
             ),
             Divider(height: 1, color: Colors.grey[200]),
           ],
@@ -47,6 +50,7 @@ class ThreadScreen extends ConsumerWidget {
                       itemCount: replies.length,
                       itemBuilder: (_, i) => MessageBubble(
                         message: replies[i],
+                        chatType: chatType,
                         chatId: chatId,
                       ),
                     ),
@@ -54,6 +58,7 @@ class ThreadScreen extends ConsumerWidget {
           ),
           MessageInputBar(
             onSendText: (text) => ref.read(messageNotifierProvider.notifier).sendThreadMessage(
+              chatType: chatType,
               chatId: chatId,
               messageId: messageId,
               content: text,

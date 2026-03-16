@@ -77,7 +77,7 @@ class WorkspaceScreen extends ConsumerWidget {
               subtitle: Text('${ws.memberIds.length} members • Code: ${ws.inviteCode}'),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
-                ref.read(selectedWorkspaceProvider.notifier).state = ws;
+                ref.read(selectedWorkspaceProvider.notifier).setWorkspace(ws);
                 context.go('/home');
               },
             ),

@@ -4,10 +4,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 final streamVideoProvider = Provider<StreamVideo>((ref) {
-  final user = ref.watch(authStateProvider).value;
+  final userId = ref.watch(backendUserIdProvider);
   final streamVideo = StreamVideo(
     AppConstants.streamApiKey,
-    user: User(info: UserInfo(id: user?.uid ?? 'anonymous')),
+    user: User(info: UserInfo(id: userId ?? 'anonymous')),
   );
   return streamVideo;
 });

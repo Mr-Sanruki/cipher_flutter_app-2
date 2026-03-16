@@ -9,6 +9,8 @@ import '../../../auth/data/repositories/auth_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../workspace/presentation/providers/workspace_provider.dart';
 
+typedef ChatTarget = ({String chatType, String chatId});
+
 // ─── Channels ───────────────────────────────────────────────────
 final channelsProvider = StreamProvider<List<ChannelModel>>((ref) {
   final ws = ref.watch(selectedWorkspaceProvider);
@@ -19,27 +21,38 @@ final channelsProvider = StreamProvider<List<ChannelModel>>((ref) {
 // ─── Groups ─────────────────────────────────────────────────────
 final groupsProvider = StreamProvider<List<GroupModel>>((ref) {
   final ws = ref.watch(selectedWorkspaceProvider);
-  final user = ref.watch(authStateProvider).value;
-  if (ws == null || user == null) return const Stream.empty();
-  return ref.watch(chatRepositoryProvider).getGroups(ws.id, user.uid);
+  final token = ref.watch(authTokenProvider);
+  if (ws == null || token == null) return const Stream.empty();
+  return ref.watch(chatRepositoryProvider).getGroups(ws.id);
 });
 
 // ─── DMs ────────────────────────────────────────────────────────
 final dmsProvider = StreamProvider<List<DmModel>>((ref) {
   final ws = ref.watch(selectedWorkspaceProvider);
-  final user = ref.watch(authStateProvider).value;
-  if (ws == null || user == null) return const Stream.empty();
-  return ref.watch(chatRepositoryProvider).getDms(ws.id, user.uid);
+  final token = ref.watch(authTokenProvider);
+  if (ws == null || token == null) return const Stream.empty();
+  return ref.watch(chatRepositoryProvider).getDms(ws.id);
 });
 
 // ─── Messages ───────────────────────────────────────────────────
-final messagesProvider = StreamProvider.family<List<MessageModel>, String>((ref, chatId) {
-  return ref.watch(chatRepositoryProvider).getMessages(chatId);
+final messagesProvider = StreamProvider.family<List<MessageModel>, ChatTarget>((ref, target) {
+  return ref.watch(chatRepositoryProvider).getMessages(chatType: target.chatType, chatId: target.chatId);
+});
+
+final messageSearchProvider = FutureProvider.family<List<MessageModel>, ({String chatType, String chatId, String query})>((ref, args) async {
+  if (args.query.trim().isEmpty) return [];
+  return ref
+      .watch(chatRepositoryProvider)
+      .searchMessages(chatType: args.chatType, chatId: args.chatId, query: args.query.trim());
 });
 
 final threadMessagesProvider =
-    StreamProvider.family<List<MessageModel>, ({String chatId, String messageId})>((ref, args) {
-  return ref.watch(chatRepositoryProvider).getThreadMessages(args.chatId, args.messageId);
+    StreamProvider.family<List<MessageModel>, ({String chatType, String chatId, String messageId})>((ref, args) {
+  return ref.watch(chatRepositoryProvider).getThreadMessages(
+    chatType: args.chatType,
+    chatId: args.chatId,
+    messageId: args.messageId,
+  );
 });
 
 // ─── Message Notifier ───────────────────────────────────────────
@@ -53,7 +66,16 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
   MessageNotifier(this._repo, this._ref) : super(const AsyncValue.data(null));
 
+  Future<void> markDelivered({required String chatType, required String chatId, required List<String> messageIds}) async {
+    await _repo.markDelivered(chatType: chatType, chatId: chatId, messageIds: messageIds);
+  }
+
+  Future<void> markRead({required String chatType, required String chatId, required List<String> messageIds}) async {
+    await _repo.markRead(chatType: chatType, chatId: chatId, messageIds: messageIds);
+  }
+
   Future<void> sendMessage({
+    required String chatType,
     required String chatId,
     required String content,
     MessageType type = MessageType.text,
@@ -63,12 +85,11 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final user = _ref.read(authStateProvider).value!;
       final userModel = await _ref.read(authRepositoryProvider).getCurrentUser();
       await _repo.sendMessage(
+        chatType: chatType,
         chatId: chatId,
-        senderId: user.uid,
-        senderName: userModel?.name ?? user.email ?? 'User',
+        senderName: userModel?.name ?? 'User',
         senderAvatar: userModel?.avatarUrl,
         content: content,
         type: type,
@@ -79,10 +100,9 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
-  Future<void> sendFile(String chatId, File file) async {
+  Future<void> sendFile({required String chatType, required String chatId, required File file}) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final user = _ref.read(authStateProvider).value!;
       final userModel = await _ref.read(authRepositoryProvider).getCurrentUser();
       final fileName = file.path.split('/').last;
       final fileSize = '${(await file.length() / 1024).toStringAsFixed(1)} KB';
@@ -96,8 +116,8 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
                   ? MessageType.audio
                   : MessageType.file;
       await _repo.sendMessage(
+        chatType: chatType,
         chatId: chatId,
-        senderId: user.uid,
         senderName: userModel?.name ?? 'User',
         senderAvatar: userModel?.avatarUrl,
         content: fileName,
@@ -117,22 +137,55 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
     state = await AsyncValue.guard(() => _repo.deleteMessage(chatId, messageId));
   }
 
+  Future<void> toggleReaction({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+    required String emoji,
+  }) async {
+    state = await AsyncValue.guard(() async {
+      await _repo.toggleReaction(chatType: chatType, chatId: chatId, messageId: messageId, emoji: emoji);
+    });
+  }
+
+  Future<void> forwardMessage({
+    required String sourceChatType,
+    required String sourceChatId,
+    required String messageId,
+    required String targetChatType,
+    required String targetChatId,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final userModel = await _ref.read(authRepositoryProvider).getCurrentUser();
+      await _repo.forwardMessage(
+        sourceChatType: sourceChatType,
+        sourceChatId: sourceChatId,
+        messageId: messageId,
+        targetChatType: targetChatType,
+        targetChatId: targetChatId,
+        senderName: userModel?.name ?? 'User',
+        senderAvatar: userModel?.avatarUrl,
+      );
+    });
+  }
+
   Future<void> sendThreadMessage({
+    required String chatType,
     required String chatId,
     required String messageId,
     required String content,
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final user = _ref.read(authStateProvider).value!;
       final userModel = await _ref.read(authRepositoryProvider).getCurrentUser();
       final msg = MessageModel(
-        id: '', senderId: user.uid,
+        id: '', senderId: '',
         senderName: userModel?.name ?? 'User',
         senderAvatar: userModel?.avatarUrl,
         content: content, createdAt: DateTime.now(),
       );
-      await _repo.sendThreadMessage(chatId: chatId, messageId: messageId, message: msg);
+      await _repo.sendThreadMessage(chatType: chatType, chatId: chatId, messageId: messageId, message: msg);
     });
   }
 }
@@ -153,10 +206,9 @@ class ChatSetupNotifier extends StateNotifier<AsyncValue<void>> {
     ChannelModel? channel;
     state = await AsyncValue.guard(() async {
       final ws = _ref.read(selectedWorkspaceProvider)!;
-      final user = _ref.read(authStateProvider).value!;
       channel = await _repo.createChannel(
         workspaceId: ws.id, name: name,
-        createdBy: user.uid, description: description,
+        description: description,
         isAnnouncement: isAnnouncement,
       );
     });
@@ -168,10 +220,9 @@ class ChatSetupNotifier extends StateNotifier<AsyncValue<void>> {
     GroupModel? group;
     state = await AsyncValue.guard(() async {
       final ws = _ref.read(selectedWorkspaceProvider)!;
-      final user = _ref.read(authStateProvider).value!;
       group = await _repo.createGroup(
         workspaceId: ws.id, name: name,
-        createdBy: user.uid, memberIds: memberIds,
+        memberIds: memberIds,
       );
     });
     return group;

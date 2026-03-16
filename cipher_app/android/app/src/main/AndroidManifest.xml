@@ -42,11 +42,14 @@
               android:resource="@style/NormalTheme"/>
 
             <!-- Deep link for Firebase Auth email link -->
-            <intent-filter android:autoVerify="true">
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="cipherapp.page.link"/>
+                <data
+                    android:scheme="https"
+                    android:host="cipher-80d89.firebaseapp.com"
+                    android:pathPrefix="/verify" />
             </intent-filter>
 
             <intent-filter>
