@@ -95,6 +95,13 @@ function roomFor(chatType, chatId) {
   return `chat:${chatType}:${String(chatId)}`;
 }
 
+function emitToUser(io, userId, event, payload) {
+  if (!io) return;
+  const id = String(userId || '').trim();
+  if (!id) return;
+  io.to(`user:${id}`).emit(event, payload);
+}
+
 function createChatsRouter(io) {
   const router = express.Router();
 
@@ -410,7 +417,7 @@ function createChatsRouter(io) {
       { upsert: true }
     );
 
-    if (io) socketEmitSafe(io, `user:${String(userId)}`, 'chat:cleared', { chatType, chatId, clearedAt: now });
+    emitToUser(io, userId, 'chat:cleared', { chatType, chatId, clearedAt: now });
     return res.json({ ok: true });
   });
 
