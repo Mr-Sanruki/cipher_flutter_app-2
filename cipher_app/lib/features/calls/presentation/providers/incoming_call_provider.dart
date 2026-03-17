@@ -4,7 +4,8 @@ import '../../../chat/data/repositories/chat_repository.dart';
 class IncomingCallState {
   final String? fromUserId;
   final String? callId;
-  const IncomingCallState({this.fromUserId, this.callId});
+  final String callType;
+  const IncomingCallState({this.fromUserId, this.callId, this.callType = 'voice'});
 
   bool get hasCall => fromUserId != null && callId != null;
 }
@@ -20,8 +21,9 @@ class IncomingCallNotifier extends StateNotifier<IncomingCallState> {
     _repo.incomingCalls().listen((m) {
       final from = m['fromUserId'];
       final call = m['callId'];
+      final type = (m['callType'] ?? 'voice').toString();
       if (from == null || call == null) return;
-      state = IncomingCallState(fromUserId: from, callId: call);
+      state = IncomingCallState(fromUserId: from, callId: call, callType: type);
     });
   }
 

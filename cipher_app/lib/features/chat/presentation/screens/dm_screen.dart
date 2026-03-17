@@ -100,11 +100,22 @@ class _DmScreenState extends ConsumerState<DmScreen> {
             onPressed: () {
               if (myId != null && dm != null) {
                 final toUserId = dm.otherUserId(myId);
-                ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId);
+                ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId, callType: 'voice');
               }
               context.push('/call/${widget.dmId}');
             },
             tooltip: 'Voice call',
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined),
+            onPressed: () {
+              if (myId != null && dm != null) {
+                final toUserId = dm.otherUserId(myId);
+                ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId, callType: 'video');
+              }
+              context.push('/video-call/${widget.dmId}');
+            },
+            tooltip: 'Video call',
           ),
           PopupMenuButton<String>(
             onSelected: (v) async {

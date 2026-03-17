@@ -20,6 +20,7 @@ import '../../features/settings/presentation/screens/profile_screen.dart';
 import '../../features/settings/presentation/screens/account_screen.dart';
 import '../../features/settings/presentation/screens/workspace_settings_screen.dart';
 import '../../features/calls/presentation/screens/voice_call_screen.dart';
+import '../../features/calls/presentation/screens/video_call_screen.dart';
 import '../../features/workspace/presentation/screens/members_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -77,6 +78,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/call/:id',
         builder: (c, s) => VoiceCallScreen(callId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/video-call/:id',
+        builder: (c, s) => VideoCallScreen(callId: s.pathParameters['id']!),
       ),
     ],
     errorBuilder: (c, s) => Scaffold(

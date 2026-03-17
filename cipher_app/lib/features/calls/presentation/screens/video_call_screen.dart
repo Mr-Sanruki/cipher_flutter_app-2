@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import '../providers/call_provider.dart';
 
-class VoiceCallScreen extends ConsumerStatefulWidget {
+class VideoCallScreen extends ConsumerStatefulWidget {
   final String callId;
-  const VoiceCallScreen({super.key, required this.callId});
+  const VideoCallScreen({super.key, required this.callId});
 
   @override
-  ConsumerState<VoiceCallScreen> createState() => _VoiceCallScreenState();
+  ConsumerState<VideoCallScreen> createState() => _VideoCallScreenState();
 }
 
-class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
+class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   Call? _call;
 
   @override
@@ -53,10 +53,7 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
 
     return StreamCallContainer(
       call: call,
-      callConnectOptions: CallConnectOptions(
-        speakerDefaultOn: true,
-        camera: TrackOption.disabled(),
-      ),
+      callConnectOptions: const CallConnectOptions(speakerDefaultOn: true),
       pictureInPictureConfiguration: const PictureInPictureConfiguration(
         enablePictureInPicture: false,
       ),

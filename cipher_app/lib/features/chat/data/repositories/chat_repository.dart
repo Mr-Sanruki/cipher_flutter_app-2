@@ -82,8 +82,9 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
+        final callType = (payload['callType'] ?? 'voice').toString().trim();
         if (fromUserId.isEmpty || callId.isEmpty) return;
-        _incomingCallController.add({'fromUserId': fromUserId, 'callId': callId});
+        _incomingCallController.add({'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
     });
 
@@ -106,19 +107,19 @@ class ChatRepository {
     return _incomingCallController.stream;
   }
 
-  void sendCallInvite({required String toUserId, required String callId}) {
+  void sendCallInvite({required String toUserId, required String callId, String callType = 'voice'}) {
     _ensureSocketConnected();
-    _socket?.emit('call:invite', {'toUserId': toUserId, 'callId': callId});
+    _socket?.emit('call:invite', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
   }
 
-  void sendCallAccept({required String toUserId, required String callId}) {
+  void sendCallAccept({required String toUserId, required String callId, String callType = 'voice'}) {
     _ensureSocketConnected();
-    _socket?.emit('call:accept', {'toUserId': toUserId, 'callId': callId});
+    _socket?.emit('call:accept', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
   }
 
-  void sendCallDecline({required String toUserId, required String callId}) {
+  void sendCallDecline({required String toUserId, required String callId, String callType = 'voice'}) {
     _ensureSocketConnected();
-    _socket?.emit('call:decline', {'toUserId': toUserId, 'callId': callId});
+    _socket?.emit('call:decline', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
   }
 
   // ─── Channels ───────────────────────────────────────────────

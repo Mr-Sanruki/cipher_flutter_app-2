@@ -112,7 +112,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     ref.listen(incomingCallProvider, (prev, next) {
       if (next.hasCall && (prev?.callId != next.callId)) {
-        _showIncomingCall(context, next.fromUserId!, next.callId!);
+        _showIncomingCall(context, next.fromUserId!, next.callId!, next.callType);
       }
     });
 
@@ -180,9 +180,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Future<void> _showIncomingCall(BuildContext context, String fromUserId, String callId) async {
+  Future<void> _showIncomingCall(BuildContext context, String fromUserId, String callId, String callType) async {
     final uAsync = ref.read(userByIdProvider(fromUserId));
     final u = uAsync.value;
+
+    final normalizedType = callType.trim().toLowerCase();
+    final isVideo = normalizedType == 'video';
 
     await showModalBottomSheet<void>(
       context: context,
@@ -201,7 +204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: (u?.avatarUrl == null || (u!.avatarUrl ?? '').isEmpty) ? const Icon(Icons.person_outline) : null,
                   ),
                   title: Text(u?.name ?? fromUserId, overflow: TextOverflow.ellipsis),
-                  subtitle: const Text('Incoming call'),
+                  subtitle: Text(isVideo ? 'Incoming video call' : 'Incoming call'),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -210,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () {
                           ref.read(incomingCallProvider.notifier).clear();
-                          ref.read(chatRepositoryProvider).sendCallDecline(toUserId: fromUserId, callId: callId);
+                          ref.read(chatRepositoryProvider).sendCallDecline(toUserId: fromUserId, callId: callId, callType: normalizedType);
                           Navigator.pop(ctx);
                         },
                         icon: const Icon(Icons.call_end, color: Colors.red),
@@ -222,11 +225,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           ref.read(incomingCallProvider.notifier).clear();
-                          ref.read(chatRepositoryProvider).sendCallAccept(toUserId: fromUserId, callId: callId);
+                          ref.read(chatRepositoryProvider).sendCallAccept(toUserId: fromUserId, callId: callId, callType: normalizedType);
                           Navigator.pop(ctx);
-                          context.push('/call/$callId');
+                          context.push(isVideo ? '/video-call/$callId' : '/call/$callId');
                         },
-                        icon: const Icon(Icons.call),
+                        icon: Icon(isVideo ? Icons.videocam : Icons.call),
                         label: const Text('Accept'),
                       ),
                     ),

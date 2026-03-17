@@ -95,28 +95,31 @@ async function start() {
       });
     });
 
-    socket.on('call:invite', ({ toUserId, callId }) => {
+    socket.on('call:invite', ({ toUserId, callId, callType }) => {
       const fromUserId = String(socket.user?.sub || '').trim();
       const to = String(toUserId || '').trim();
       const id = String(callId || '').trim();
+      const type = String(callType || 'voice').trim();
       if (!fromUserId || !to || !id) return;
-      io.to(`user:${to}`).emit('call:incoming', { fromUserId, callId: id });
+      io.to(`user:${to}`).emit('call:incoming', { fromUserId, callId: id, callType: type });
     });
 
-    socket.on('call:accept', ({ toUserId, callId }) => {
+    socket.on('call:accept', ({ toUserId, callId, callType }) => {
       const fromUserId = String(socket.user?.sub || '').trim();
       const to = String(toUserId || '').trim();
       const id = String(callId || '').trim();
+      const type = String(callType || 'voice').trim();
       if (!fromUserId || !to || !id) return;
-      io.to(`user:${to}`).emit('call:accepted', { fromUserId, callId: id });
+      io.to(`user:${to}`).emit('call:accepted', { fromUserId, callId: id, callType: type });
     });
 
-    socket.on('call:decline', ({ toUserId, callId }) => {
+    socket.on('call:decline', ({ toUserId, callId, callType }) => {
       const fromUserId = String(socket.user?.sub || '').trim();
       const to = String(toUserId || '').trim();
       const id = String(callId || '').trim();
+      const type = String(callType || 'voice').trim();
       if (!fromUserId || !to || !id) return;
-      io.to(`user:${to}`).emit('call:declined', { fromUserId, callId: id });
+      io.to(`user:${to}`).emit('call:declined', { fromUserId, callId: id, callType: type });
     });
   });
 
