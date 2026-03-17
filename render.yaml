@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: cipher-backend
+    name: cipher1_backend
     env: node
     rootDir: backend
     plan: free
