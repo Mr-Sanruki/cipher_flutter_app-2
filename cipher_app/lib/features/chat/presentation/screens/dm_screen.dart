@@ -19,12 +19,14 @@ class DmScreen extends ConsumerStatefulWidget {
 }
 
 class _DmScreenState extends ConsumerState<DmScreen> {
+  ProviderSubscription<AsyncValue<List<MessageModel>>>? _messagesSub;
+
   @override
   void initState() {
     super.initState();
 
     final target = (chatType: 'dm', chatId: widget.dmId);
-    ref.listen<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
+    _messagesSub = ref.listenManual<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
       final myId = ref.read(backendUserIdProvider);
       if (myId == null) return;
 
@@ -46,6 +48,12 @@ class _DmScreenState extends ConsumerState<DmScreen> {
         }
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _messagesSub?.close();
+    super.dispose();
   }
 
   @override

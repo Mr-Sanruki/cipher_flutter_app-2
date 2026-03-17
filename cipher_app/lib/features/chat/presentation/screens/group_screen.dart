@@ -20,12 +20,14 @@ class GroupScreen extends ConsumerStatefulWidget {
 }
 
 class _GroupScreenState extends ConsumerState<GroupScreen> {
+  ProviderSubscription<AsyncValue<List<MessageModel>>>? _messagesSub;
+
   @override
   void initState() {
     super.initState();
 
     final target = (chatType: 'group', chatId: widget.groupId);
-    ref.listen<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
+    _messagesSub = ref.listenManual<AsyncValue<List<MessageModel>>>(messagesProvider(target), (prev, next) {
       final myId = ref.read(backendUserIdProvider);
       if (myId == null) return;
 
@@ -47,6 +49,12 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
         }
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _messagesSub?.close();
+    super.dispose();
   }
 
   @override
