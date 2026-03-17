@@ -52,8 +52,17 @@ class _DmScreenState extends ConsumerState<DmScreen> {
     final messagesAsync = ref.watch(messagesProvider((chatType: 'dm', chatId: widget.dmId)));
     final dmsAsync = ref.watch(dmsProvider);
     final myId = ref.watch(backendUserIdProvider);
-    final dm = dmsAsync.value?.firstWhere((d) => d.id == widget.dmId, orElse: () => dmsAsync.value!.first);
-    final otherId = dm != null && myId != null ? dm.otherUserId(myId) : 'User';
+    DmModel? dm;
+    final dms = dmsAsync.value;
+    if (dms != null) {
+      for (final d in dms) {
+        if (d.id == widget.dmId) {
+          dm = d;
+          break;
+        }
+      }
+    }
+    final otherId = (dm != null && myId != null) ? dm.otherUserId(myId) : 'User';
     final otherUserAsync = myId != null ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
     final otherUser = otherUserAsync.value;
 

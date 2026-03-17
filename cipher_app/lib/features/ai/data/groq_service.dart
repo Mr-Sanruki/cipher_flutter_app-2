@@ -31,16 +31,31 @@ class GroqService {
     final jwt = _authRepo.getSavedToken();
     if (jwt == null) throw Exception('UNAUTHORIZED');
 
-    final response = await _dio.post(
-      '/ai/chat',
-      data: {'messages': messages.map((m) => m.toJson()).toList()},
-      options: Options(headers: {'Authorization': 'Bearer $jwt'}),
-    );
+    try {
+      final response = await _dio.post(
+        '/ai/chat',
+        data: {'messages': messages.map((m) => m.toJson()).toList()},
+        options: Options(headers: {'Authorization': 'Bearer $jwt'}),
+      );
 
-    final data = response.data;
-    if (data is Map && data['content'] is String) {
-      return data['content'] as String;
+      final data = response.data;
+      if (data is Map && data['content'] is String) {
+        return data['content'] as String;
+      }
+      throw Exception('Invalid AI response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final err = data['error']?.toString();
+        final details = data['details']?.toString();
+        final hint = data['hint']?.toString();
+        final msg = data['message']?.toString();
+        final parts = [err, msg, hint, details].where((x) => x != null && x!.trim().isNotEmpty).map((x) => x!.trim()).toList();
+        if (parts.isNotEmpty) {
+          throw Exception(parts.join(' | '));
+        }
+      }
+      throw Exception(e.message ?? 'Network error');
     }
-    throw Exception('Invalid AI response');
   }
 }

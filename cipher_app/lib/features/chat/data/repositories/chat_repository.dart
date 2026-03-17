@@ -21,6 +21,7 @@ class ChatRepository {
   final String _baseUrl;
 
   sio.Socket? _socket;
+  Timer? _socketRetryTimer;
   final _incomingCallController = StreamController<Map<String, String>>.broadcast();
   final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
   final Map<String, List<MessageModel>> _messageCache = {};
@@ -57,6 +58,25 @@ class ChatRepository {
     s.on('connect', (_) {});
     s.on('connect_error', (_) {});
 
+    s.on('chat:cleared', (payload) async {
+      try {
+        if (payload is! Map) return;
+        final chatType = (payload['chatType'] ?? '').toString().trim();
+        final chatId = (payload['chatId'] ?? '').toString().trim();
+        if (chatType.isEmpty || chatId.isEmpty) return;
+
+        final key = _key(chatType, chatId);
+        final controller = _messageControllers[key];
+        if (controller == null) return;
+        _messageCache[key] = [];
+        if (!controller.isClosed) controller.add([]);
+
+        final refreshed = await listMessages(chatType: chatType, chatId: chatId);
+        _messageCache[key] = refreshed;
+        if (!controller.isClosed) controller.add(refreshed);
+      } catch (_) {}
+    });
+
     s.on('call:incoming', (payload) {
       try {
         if (payload is! Map) return;
@@ -72,6 +92,16 @@ class ChatRepository {
   }
 
   Stream<Map<String, String>> incomingCalls() {
+    _socketRetryTimer ??= Timer.periodic(const Duration(seconds: 2), (t) {
+      try {
+        if (_socket != null && _socket!.connected) {
+          t.cancel();
+          _socketRetryTimer = null;
+          return;
+        }
+        _ensureSocketConnected();
+      } catch (_) {}
+    });
     _ensureSocketConnected();
     return _incomingCallController.stream;
   }

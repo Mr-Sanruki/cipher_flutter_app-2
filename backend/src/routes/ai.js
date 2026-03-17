@@ -5,11 +5,16 @@ const aiRouter = express.Router();
 
 aiRouter.post('/chat', requireAuth, async (req, res) => {
   const raw = req.body;
+  const prompt =
+    (raw && typeof raw.prompt === 'string' ? raw.prompt : null) ||
+    (raw && typeof raw.message === 'string' ? raw.message : null) ||
+    (typeof raw === 'string' ? raw : null);
+
   const messagesRaw =
     (raw && Array.isArray(raw.messages) ? raw.messages : null) ||
     (raw && raw.data && Array.isArray(raw.data.messages) ? raw.data.messages : null) ||
     (raw && Array.isArray(raw.history) ? raw.history : null) ||
-    [];
+    (prompt ? [{ role: 'user', content: prompt }] : []);
 
   const messages = messagesRaw
     .map((m) => {
@@ -22,9 +27,16 @@ aiRouter.post('/chat', requireAuth, async (req, res) => {
     .filter(Boolean);
 
   if (messages.length === 0) {
+    // eslint-disable-next-line no-console
+    console.error('[ai] invalid payload', {
+      keys: raw && typeof raw === 'object' ? Object.keys(raw) : typeof raw,
+      hasPrompt: Boolean(prompt && String(prompt).trim()),
+      messagesType: raw && typeof raw === 'object' ? typeof raw.messages : undefined,
+      messagesLength: Array.isArray(raw?.messages) ? raw.messages.length : undefined,
+    });
     return res.status(400).json({
       error: 'MESSAGES_REQUIRED',
-      hint: 'Expected body: { messages: [{ role: "user"|"assistant", content: "..." }] }',
+      hint: 'Expected body: { messages: [{ role: "user"|"assistant", content: "..." }] } or { prompt: "..." }',
     });
   }
 
