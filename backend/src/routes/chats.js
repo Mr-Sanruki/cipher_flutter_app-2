@@ -6,6 +6,8 @@ const { Channel } = require('../models/Channel');
 const { Group } = require('../models/Group');
 const { Dm } = require('../models/Dm');
 const { Message } = require('../models/Message');
+const { ChatClear } = require('../models/ChatClear');
+const { ChatHide } = require('../models/ChatHide');
 
 function toChannelDto(c) {
   return {
@@ -285,8 +287,15 @@ function createChatsRouter(io) {
     const workspaceId = String(req.query.workspaceId || '').trim();
     if (!workspaceId) return res.status(400).json({ error: 'WORKSPACE_ID_REQUIRED' });
 
-    const items = await Dm.find({ workspaceId, memberIds: userId }).sort({ lastMessageAt: -1, createdAt: -1 }).lean();
-    return res.json({ items: items.map(toDmDto) });
+    const hidden = await ChatHide.find({ userId, chatType: 'dm' }).lean();
+    const hiddenIds = new Set(hidden.map((h) => String(h.chatId)));
+
+    const items = await Dm.find({ workspaceId, memberIds: userId })
+      .sort({ lastMessageAt: -1, createdAt: -1 })
+      .lean();
+
+    const filtered = items.filter((d) => !hiddenIds.has(String(d._id)));
+    return res.json({ items: filtered.map(toDmDto) });
   });
 
   router.post('/dms', requireAuth, async (req, res) => {
@@ -322,7 +331,14 @@ function createChatsRouter(io) {
     const authz = await authorizeChatAccess({ chatType, chatId, userId });
     if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
 
-    const items = await Message.find({ chatType, chatId }).sort({ createdAt: -1 }).limit(limit).lean();
+    const clear = await ChatClear.findOne({ userId, chatType, chatId }).lean();
+    const filter = {
+      chatType,
+      chatId,
+      ...(clear?.clearedAt ? { createdAt: { $gt: new Date(clear.clearedAt) } } : {}),
+    };
+
+    const items = await Message.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
     return res.json({ items: items.map(toMessageDto) });
   });
 
@@ -387,12 +403,34 @@ function createChatsRouter(io) {
     const authz = await authorizeChatAccess({ chatType, chatId, userId });
     if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
 
-    await Message.updateMany(
-      { chatType, chatId },
-      { $set: { isDeleted: true, content: 'This message was deleted' } }
+    const now = new Date();
+    await ChatClear.updateOne(
+      { userId, chatType, chatId },
+      { $set: { userId, chatType, chatId, clearedAt: now } },
+      { upsert: true }
     );
 
-    if (io) io.to(roomFor(chatType, chatId)).emit('chat:cleared', { chatType, chatId });
+    if (io) socketEmitSafe(io, `user:${String(userId)}`, 'chat:cleared', { chatType, chatId, clearedAt: now });
+    return res.json({ ok: true });
+  });
+
+  router.post('/dm/:dmId/hide', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const dmId = String(req.params.dmId || '').trim();
+    if (!dmId) return res.status(400).json({ error: 'DM_ID_REQUIRED' });
+
+    const dm = await Dm.findById(dmId).lean();
+    if (!dm) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (!(dm.memberIds || []).some((x) => String(x) === String(userId))) {
+      return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    await ChatHide.updateOne(
+      { userId, chatType: 'dm', chatId: dmId },
+      { $set: { userId, chatType: 'dm', chatId: dmId, hiddenAt: new Date() } },
+      { upsert: true }
+    );
+
     return res.json({ ok: true });
   });
 

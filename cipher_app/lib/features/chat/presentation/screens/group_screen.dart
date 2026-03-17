@@ -103,6 +103,16 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showGroupInfo(context, group?.memberIds ?? []),
           ),
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'clear') {
+                await ref.read(messageNotifierProvider.notifier).clearChat(chatType: 'group', chatId: widget.groupId);
+              }
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'clear', child: Text('Clear chat')),
+            ],
+          ),
         ],
       ),
       body: Column(

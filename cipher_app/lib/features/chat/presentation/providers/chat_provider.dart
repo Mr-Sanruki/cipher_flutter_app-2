@@ -133,10 +133,18 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
     state = await AsyncValue.guard(() => _repo.editMessage(chatId, messageId, content));
   }
 
-  Future<void> deleteMessage(String chatId, String messageId) async {
+  Future<void> deleteMessage({required String chatType, required String chatId, required String messageId}) async {
     state = await AsyncValue.guard(
-      () => _repo.deleteMessage(chatType: 'dm', chatId: chatId, messageId: messageId),
+      () => _repo.deleteMessage(chatType: chatType, chatId: chatId, messageId: messageId),
     );
+  }
+
+  Future<void> clearChat({required String chatType, required String chatId}) async {
+    state = await AsyncValue.guard(() => _repo.clearChat(chatType: chatType, chatId: chatId));
+  }
+
+  Future<void> hideDm({required String dmId}) async {
+    state = await AsyncValue.guard(() => _repo.hideDm(dmId: dmId));
   }
 
   Future<void> toggleReaction({

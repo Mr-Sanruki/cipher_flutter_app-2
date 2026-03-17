@@ -117,6 +117,13 @@ authRouter.post('/request-otp', async (req, res) => {
       port,
       secure: port === 465,
       auth: { user, pass },
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 20_000,
+      tls: {
+        servername: host,
+        rejectUnauthorized: false,
+      },
     });
 
     transporter

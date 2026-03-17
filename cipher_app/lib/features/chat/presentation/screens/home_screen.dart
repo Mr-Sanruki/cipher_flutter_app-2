@@ -7,6 +7,7 @@ import '../../../workspace/presentation/providers/workspace_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 import '../../../auth/presentation/providers/user_lookup_provider.dart';
+import '../../../calls/presentation/providers/incoming_call_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -109,6 +110,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(incomingCallProvider, (prev, next) {
+      if (next.hasCall && (prev?.callId != next.callId)) {
+        _showIncomingCall(context, next.fromUserId!, next.callId!);
+      }
+    });
+
     final workspace = ref.watch(selectedWorkspaceProvider);
     if (workspace == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/workspace'));
@@ -170,6 +177,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.group_outlined), label: 'Groups'),
         ],
       ),
+    );
+  }
+
+  Future<void> _showIncomingCall(BuildContext context, String fromUserId, String callId) async {
+    final uAsync = ref.read(userByIdProvider(fromUserId));
+    final u = uAsync.value;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: u?.avatarUrl != null && (u!.avatarUrl ?? '').isNotEmpty ? NetworkImage(u.avatarUrl!) : null,
+                    child: (u?.avatarUrl == null || (u!.avatarUrl ?? '').isEmpty) ? const Icon(Icons.person_outline) : null,
+                  ),
+                  title: Text(u?.name ?? fromUserId, overflow: TextOverflow.ellipsis),
+                  subtitle: const Text('Incoming call'),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ref.read(incomingCallProvider.notifier).clear();
+                          ref.read(chatRepositoryProvider).sendCallDecline(toUserId: fromUserId, callId: callId);
+                          Navigator.pop(ctx);
+                        },
+                        icon: const Icon(Icons.call_end, color: Colors.red),
+                        label: const Text('Decline', style: TextStyle(color: Colors.red)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ref.read(incomingCallProvider.notifier).clear();
+                          ref.read(chatRepositoryProvider).sendCallAccept(toUserId: fromUserId, callId: callId);
+                          Navigator.pop(ctx);
+                          context.push('/call/$callId');
+                        },
+                        icon: const Icon(Icons.call),
+                        label: const Text('Accept'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -72,6 +72,9 @@ async function start() {
   });
 
   io.on('connection', (socket) => {
+    const userId = String(socket.user?.sub || '').trim();
+    if (userId) socket.join(`user:${userId}`);
+
     socket.on('chat:join', ({ chatType, chatId }) => {
       if (!chatType || !chatId) return;
       socket.join(roomFor(String(chatType), String(chatId)));
@@ -90,6 +93,30 @@ async function start() {
         userId: String(socket.user?.sub || ''),
         isTyping: Boolean(isTyping),
       });
+    });
+
+    socket.on('call:invite', ({ toUserId, callId }) => {
+      const fromUserId = String(socket.user?.sub || '').trim();
+      const to = String(toUserId || '').trim();
+      const id = String(callId || '').trim();
+      if (!fromUserId || !to || !id) return;
+      io.to(`user:${to}`).emit('call:incoming', { fromUserId, callId: id });
+    });
+
+    socket.on('call:accept', ({ toUserId, callId }) => {
+      const fromUserId = String(socket.user?.sub || '').trim();
+      const to = String(toUserId || '').trim();
+      const id = String(callId || '').trim();
+      if (!fromUserId || !to || !id) return;
+      io.to(`user:${to}`).emit('call:accepted', { fromUserId, callId: id });
+    });
+
+    socket.on('call:decline', ({ toUserId, callId }) => {
+      const fromUserId = String(socket.user?.sub || '').trim();
+      const to = String(toUserId || '').trim();
+      const id = String(callId || '').trim();
+      if (!fromUserId || !to || !id) return;
+      io.to(`user:${to}`).emit('call:declined', { fromUserId, callId: id });
     });
   });
 

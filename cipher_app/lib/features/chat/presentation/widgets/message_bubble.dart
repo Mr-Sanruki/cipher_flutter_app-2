@@ -327,7 +327,7 @@ class MessageBubble extends ConsumerWidget {
                 onTap: () {
                   Navigator.pop(context);
                   ref.read(messageNotifierProvider.notifier)
-                      .deleteMessage(chatId, message.id);
+                      .deleteMessage(chatType: chatType, chatId: chatId, messageId: message.id);
                 },
               ),
             ],

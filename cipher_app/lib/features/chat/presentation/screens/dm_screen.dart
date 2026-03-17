@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
+import '../../data/repositories/chat_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/user_lookup_provider.dart';
 import '../../data/models/message_model.dart';
@@ -86,8 +87,29 @@ class _DmScreenState extends ConsumerState<DmScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.call_outlined),
-            onPressed: () => context.push('/call/${widget.dmId}'),
+            onPressed: () {
+              if (myId != null && dm != null) {
+                final toUserId = dm.otherUserId(myId);
+                ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId);
+              }
+              context.push('/call/${widget.dmId}');
+            },
             tooltip: 'Voice call',
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'clear') {
+                await ref.read(messageNotifierProvider.notifier).clearChat(chatType: 'dm', chatId: widget.dmId);
+              }
+              if (v == 'delete') {
+                await ref.read(messageNotifierProvider.notifier).hideDm(dmId: widget.dmId);
+                if (context.mounted) context.pop();
+              }
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'clear', child: Text('Clear chat')),
+              PopupMenuItem(value: 'delete', child: Text('Delete chat')),
+            ],
           ),
         ],
       ),

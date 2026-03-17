@@ -77,6 +77,16 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               context.push('/chat-search/channel/${widget.channelId}');
             },
           ),
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              if (v == 'clear') {
+                await ref.read(messageNotifierProvider.notifier).clearChat(chatType: 'channel', chatId: widget.channelId);
+              }
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'clear', child: Text('Clear chat')),
+            ],
+          ),
         ],
       ),
       body: Column(

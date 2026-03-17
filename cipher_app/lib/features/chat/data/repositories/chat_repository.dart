@@ -21,6 +21,7 @@ class ChatRepository {
   final String _baseUrl;
 
   sio.Socket? _socket;
+  final _incomingCallController = StreamController<Map<String, String>>.broadcast();
   final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
   final Map<String, List<MessageModel>> _messageCache = {};
 
@@ -55,8 +56,39 @@ class ChatRepository {
 
     s.on('connect', (_) {});
     s.on('connect_error', (_) {});
+
+    s.on('call:incoming', (payload) {
+      try {
+        if (payload is! Map) return;
+        final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
+        final callId = (payload['callId'] ?? '').toString().trim();
+        if (fromUserId.isEmpty || callId.isEmpty) return;
+        _incomingCallController.add({'fromUserId': fromUserId, 'callId': callId});
+      } catch (_) {}
+    });
+
     s.connect();
     _socket = s;
+  }
+
+  Stream<Map<String, String>> incomingCalls() {
+    _ensureSocketConnected();
+    return _incomingCallController.stream;
+  }
+
+  void sendCallInvite({required String toUserId, required String callId}) {
+    _ensureSocketConnected();
+    _socket?.emit('call:invite', {'toUserId': toUserId, 'callId': callId});
+  }
+
+  void sendCallAccept({required String toUserId, required String callId}) {
+    _ensureSocketConnected();
+    _socket?.emit('call:accept', {'toUserId': toUserId, 'callId': callId});
+  }
+
+  void sendCallDecline({required String toUserId, required String callId}) {
+    _ensureSocketConnected();
+    _socket?.emit('call:decline', {'toUserId': toUserId, 'callId': callId});
   }
 
   // ─── Channels ───────────────────────────────────────────────
@@ -409,9 +441,9 @@ class ChatRepository {
     );
   }
 
-  Future<void> deleteDm({required String dmId}) async {
-    await _dio.delete(
-      '/chats/dm/$dmId',
+  Future<void> hideDm({required String dmId}) async {
+    await _dio.post(
+      '/chats/dm/$dmId/hide',
       options: Options(headers: _headers()),
     );
   }
