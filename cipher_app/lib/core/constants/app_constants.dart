@@ -9,7 +9,7 @@ class AppConstants {
   static const String streamApiKey = 'z3qps2tk4aes'; // Replace with your key
 
   static const String backendBaseUrl =
-      String.fromEnvironment('BACKEND_BASE_URL', defaultValue: 'http://localhost:8080');
+      String.fromEnvironment('BACKEND_BASE_URL', defaultValue: 'https://cipher1-backend.onrender.com');
 
   // Firestore Collections
   static const String usersCollection = 'users';

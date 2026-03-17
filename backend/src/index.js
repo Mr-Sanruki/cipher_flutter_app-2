@@ -15,6 +15,7 @@ const { notificationsRouter } = require('./routes/notifications');
 const { uploadsRouter, UPLOAD_ROOT } = require('./routes/uploads');
 const { createChatsRouter, roomFor } = require('./routes/chats');
 const { callsRouter } = require('./routes/calls');
+const { aiRouter } = require('./routes/ai');
 const { verifyJwtToken } = require('./middleware/auth');
 
 async function start() {
@@ -49,6 +50,7 @@ async function start() {
   app.use('/uploads', uploadsRouter);
   app.use('/static', express.static(UPLOAD_ROOT));
   app.use('/calls', callsRouter);
+  app.use('/ai', aiRouter);
 
   const server = http.createServer(app);
 
