@@ -8,6 +8,110 @@ const { randomOtp6, sha256 } = require('../lib/crypto');
 
 const authRouter = express.Router();
 
+async function sendOtpEmailWithBrevo({ email, code, ttlSeconds }) {
+  const apiKey = String(process.env.BREVO_API_KEY || '').trim();
+  const fromEmail = String(process.env.BREVO_FROM_EMAIL || '').trim();
+  const fromName = String(process.env.BREVO_FROM_NAME || 'Cipher').trim();
+  if (!apiKey) return { ok: false, error: 'BREVO_API_KEY_MISSING' };
+  if (!fromEmail) return { ok: false, error: 'BREVO_FROM_EMAIL_MISSING' };
+
+  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': apiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: fromName, email: fromEmail },
+      to: [{ email }],
+      subject: 'Your Cipher login code',
+      textContent: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    const lowered = String(text || '').toLowerCase();
+    if (resp.status === 401 && lowered.includes('authorised_ips')) {
+      return {
+        ok: false,
+        error: 'BREVO_UNAUTHORIZED_IP',
+        status: resp.status,
+        details: text,
+      };
+    }
+    return { ok: false, error: 'BREVO_SEND_FAILED', status: resp.status, details: text };
+  }
+
+  const data = await resp.json().catch(() => ({}));
+  return { ok: true, messageId: data?.messageId, raw: data };
+}
+
+async function sendOtpEmailWithResend({ email, code, ttlSeconds }) {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
+  const from = String(process.env.RESEND_FROM_EMAIL || '').trim();
+  if (!apiKey) return { ok: false, error: 'RESEND_API_KEY_MISSING' };
+  if (!from) return { ok: false, error: 'RESEND_FROM_EMAIL_MISSING' };
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: email,
+      subject: 'Your Cipher login code',
+      text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    return { ok: false, error: 'RESEND_SEND_FAILED', status: resp.status, details: text };
+  }
+
+  const data = await resp.json().catch(() => ({}));
+  return { ok: true, id: data?.id, raw: data };
+}
+
+async function sendOtpEmailWithSmtp({ email, code, ttlSeconds }) {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM;
+  if (!host) return { ok: false, error: 'SMTP_HOST_MISSING' };
+  if (!user) return { ok: false, error: 'SMTP_USER_MISSING' };
+  if (!pass) return { ok: false, error: 'SMTP_PASS_MISSING' };
+  if (!from) return { ok: false, error: 'SMTP_FROM_MISSING' };
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
+    tls: {
+      servername: host,
+      rejectUnauthorized: false,
+    },
+  });
+
+  await transporter.sendMail({
+    from,
+    to: email,
+    subject: 'Your Cipher login code',
+    text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
+  });
+
+  return { ok: true };
+}
+
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
@@ -53,146 +157,51 @@ authRouter.post('/request-otp', async (req, res) => {
     expiresAt: expiresAt.toISOString(),
   });
 
-  await Otp.create({ email, codeHash, expiresAt });
-
   try {
     const provider = String(process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
     if (provider === 'brevo') {
-      const apiKey = String(process.env.BREVO_API_KEY || '').trim();
-      const fromEmail = String(process.env.BREVO_FROM_EMAIL || '').trim();
-      const fromName = String(process.env.BREVO_FROM_NAME || 'Cipher').trim();
-      if (!apiKey) return res.status(500).json({ error: 'BREVO_API_KEY_MISSING' });
-      if (!fromEmail) return res.status(500).json({ error: 'BREVO_FROM_EMAIL_MISSING' });
-
-      setImmediate(async () => {
-        try {
-          const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-              'api-key': apiKey,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-              sender: { name: fromName, email: fromEmail },
-              to: [{ email }],
-              subject: 'Your Cipher login code',
-              textContent: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
-            }),
-          });
-
-          if (!resp.ok) {
-            const t = await resp.text().catch(() => '');
+      const brevoResult = await sendOtpEmailWithBrevo({ email, code, ttlSeconds });
+      if (!brevoResult.ok) {
+        // eslint-disable-next-line no-console
+        console.error('[brevo] send error:', brevoResult);
+        if (String(process.env.RESEND_API_KEY || '').trim() && String(process.env.RESEND_FROM_EMAIL || '').trim()) {
+          const resendResult = await sendOtpEmailWithResend({ email, code, ttlSeconds });
+          if (!resendResult.ok) {
             // eslint-disable-next-line no-console
-            console.error('[brevo] send error:', resp.status, t);
-            return;
+            console.error('[resend] fallback send error:', resendResult);
+            return res.status(502).json({ error: brevoResult.error, fallbackError: resendResult.error });
           }
-
-          const data = await resp.json().catch(() => ({}));
-          // eslint-disable-next-line no-console
-          console.log('[brevo] send ok:', data?.messageId || data);
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error('[brevo] send exception:', err);
+          await Otp.create({ email, codeHash, expiresAt });
+          return res.json({ ok: true, provider: 'resend' });
         }
-      });
 
-      return res.json({ ok: true });
+        return res.status(502).json({ error: brevoResult.error });
+      }
+
+      await Otp.create({ email, codeHash, expiresAt });
+      return res.json({ ok: true, provider: 'brevo' });
     }
     if (provider === 'resend') {
-      const apiKey = process.env.RESEND_API_KEY;
-      const from = process.env.RESEND_FROM_EMAIL;
-      if (!apiKey) return res.status(500).json({ error: 'RESEND_API_KEY_MISSING' });
-      if (!from) return res.status(500).json({ error: 'RESEND_FROM_EMAIL_MISSING' });
+      const resendResult = await sendOtpEmailWithResend({ email, code, ttlSeconds });
+      if (!resendResult.ok) {
+        // eslint-disable-next-line no-console
+        console.error('[resend] send error:', resendResult);
+        return res.status(502).json({ error: resendResult.error });
+      }
 
-      setImmediate(async () => {
-        try {
-          const resp = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              from,
-              to: email,
-              subject: 'Your Cipher login code',
-              text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
-            }),
-          });
-
-          if (!resp.ok) {
-            const t = await resp.text().catch(() => '');
-            // eslint-disable-next-line no-console
-            console.error('[resend] send error:', resp.status, t);
-            return;
-          }
-
-          const data = await resp.json().catch(() => ({}));
-          // eslint-disable-next-line no-console
-          console.log('[resend] send ok:', data?.id || data);
-        } catch (err) {
-          // eslint-disable-next-line no-console
-          console.error('[resend] send exception:', err);
-        }
-      });
-
-      return res.json({ ok: true });
+      await Otp.create({ email, codeHash, expiresAt });
+      return res.json({ ok: true, provider: 'resend' });
     }
 
     if (provider !== 'smtp') {
       return res.status(500).json({ error: 'EMAIL_PROVIDER_UNSUPPORTED' });
     }
 
-    const host = process.env.SMTP_HOST;
-    const port = Number(process.env.SMTP_PORT || 587);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    const from = process.env.SMTP_FROM;
-    if (!host) return res.status(500).json({ error: 'SMTP_HOST_MISSING' });
-    if (!user) return res.status(500).json({ error: 'SMTP_USER_MISSING' });
-    if (!pass) return res.status(500).json({ error: 'SMTP_PASS_MISSING' });
-    if (!from) return res.status(500).json({ error: 'SMTP_FROM_MISSING' });
+    const smtpResult = await sendOtpEmailWithSmtp({ email, code, ttlSeconds });
+    if (!smtpResult.ok) return res.status(502).json({ error: smtpResult.error });
 
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      connectionTimeout: 15_000,
-      greetingTimeout: 15_000,
-      socketTimeout: 20_000,
-      tls: {
-        servername: host,
-        rejectUnauthorized: false,
-      },
-    });
-
-    transporter
-      .sendMail({
-        from,
-        to: email,
-        subject: 'Your Cipher login code',
-        text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
-      })
-      .then((info) => {
-        // eslint-disable-next-line no-console
-        console.log('[smtp] sendMail info:', info?.messageId || info);
-      })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error('[smtp] sendMail error:', {
-          code: err?.code,
-          command: err?.command,
-          message: err?.message,
-          name: err?.name,
-        });
-        if (String(err?.code) === 'ETIMEDOUT') {
-          console.error('[smtp] Hint: Render often blocks outbound SMTP. Use EMAIL_PROVIDER=resend instead.');
-        }
-      });
-
-    return res.json({ ok: true });
+    await Otp.create({ email, codeHash, expiresAt });
+    return res.json({ ok: true, provider: 'smtp' });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[smtp] sendMail error:', err);
