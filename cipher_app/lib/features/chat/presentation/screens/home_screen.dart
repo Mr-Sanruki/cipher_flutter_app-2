@@ -19,6 +19,24 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
 
+  ProviderSubscription<IncomingCallState>? _incomingCallSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _incomingCallSub = ref.listenManual(incomingCallProvider, (prev, next) {
+      if (next.hasCall && (prev?.callId != next.callId)) {
+        _showIncomingCall(context, next.fromUserId!, next.callId!, next.callType);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _incomingCallSub?.close();
+    super.dispose();
+  }
+
   void _showWorkspaceSwitcher() {
     final workspacesAsync = ref.read(userWorkspacesProvider);
     showModalBottomSheet(
@@ -110,12 +128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(incomingCallProvider, (prev, next) {
-      if (next.hasCall && (prev?.callId != next.callId)) {
-        _showIncomingCall(context, next.fromUserId!, next.callId!, next.callType);
-      }
-    });
-
     final workspace = ref.watch(selectedWorkspaceProvider);
     if (workspace == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/workspace'));

@@ -53,7 +53,7 @@ aiRouter.post('/chat', requireAuth, async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama3-8b-8192',
+        model: String(process.env.GROQ_MODEL || 'llama-3.1-8b-instant'),
         messages: messages,
         max_tokens: 1024,
         temperature: 0.7,
@@ -61,8 +61,22 @@ aiRouter.post('/chat', requireAuth, async (req, res) => {
     });
 
     if (!groqRes.ok) {
-      const text = await groqRes.text();
-      return res.status(groqRes.status).json({ error: 'GROQ_ERROR', details: text });
+      const text = await groqRes.text().catch(() => '');
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch (_) {
+        parsed = null;
+      }
+      const message =
+        (parsed && parsed.error && typeof parsed.error.message === 'string' && parsed.error.message) ||
+        (typeof text === 'string' ? text : '') ||
+        'Groq request failed';
+      return res.status(groqRes.status).json({
+        error: 'GROQ_ERROR',
+        message,
+        details: text,
+      });
     }
 
     const data = await groqRes.json();
