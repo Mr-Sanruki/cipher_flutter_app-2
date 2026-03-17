@@ -50,7 +50,11 @@ class GroqService {
         final details = data['details']?.toString();
         final hint = data['hint']?.toString();
         final msg = data['message']?.toString();
-        final parts = [err, msg, hint, details].where((x) => x != null && x!.trim().isNotEmpty).map((x) => x!.trim()).toList();
+        final parts = [err, msg, hint, details]
+            .whereType<String>()
+            .map((x) => x.trim())
+            .where((x) => x.isNotEmpty)
+            .toList();
         if (parts.isNotEmpty) {
           throw Exception(parts.join(' | '));
         }
