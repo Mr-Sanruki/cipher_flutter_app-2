@@ -272,7 +272,7 @@ class ChatRepository {
       final res = await _dio.get(
         '/chats/groups',
         queryParameters: {'workspaceId': workspaceId},
-        options: Options(headers: _headers()),
+        options: Options(headers: _headers(), receiveTimeout: const Duration(seconds: 60)),
       );
       final data = res.data;
       final items = (data is Map ? data['items'] : null);

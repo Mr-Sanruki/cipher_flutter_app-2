@@ -13,6 +13,7 @@ const groupSchema = new mongoose.Schema(
 );
 
 groupSchema.index({ workspaceId: 1, name: 1 });
+groupSchema.index({ workspaceId: 1, memberIds: 1 });
 
 const Group = mongoose.model('Group', groupSchema);
 

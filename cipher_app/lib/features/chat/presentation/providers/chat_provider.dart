@@ -23,7 +23,7 @@ final groupsProvider = StreamProvider<List<GroupModel>>((ref) {
   final ws = ref.watch(selectedWorkspaceProvider);
   final token = ref.watch(authTokenProvider);
   if (ws == null || token == null) return const Stream.empty();
-  return ref.watch(chatRepositoryProvider).getGroups(ws.id);
+  return ref.watch(chatRepositoryProvider).getGroups(ws.id, pollEvery: const Duration(seconds: 10));
 });
 
 // ─── DMs ────────────────────────────────────────────────────────

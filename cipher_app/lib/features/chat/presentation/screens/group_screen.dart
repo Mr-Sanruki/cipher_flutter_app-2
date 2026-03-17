@@ -105,7 +105,11 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.call_outlined),
-            onPressed: () => context.push('/call/${widget.groupId}'),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Group calls are not supported yet. Start a DM call instead.')),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
