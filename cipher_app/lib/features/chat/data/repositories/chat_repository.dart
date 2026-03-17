@@ -395,7 +395,26 @@ class ChatRepository {
 
   Future<void> editMessage(String chatId, String messageId, String newContent) async {}
 
-  Future<void> deleteMessage(String chatId, String messageId) async {}
+  Future<void> deleteMessage({required String chatType, required String chatId, required String messageId}) async {
+    await _dio.delete(
+      '/chats/$chatType/$chatId/messages/$messageId',
+      options: Options(headers: _headers()),
+    );
+  }
+
+  Future<void> clearChat({required String chatType, required String chatId}) async {
+    await _dio.post(
+      '/chats/$chatType/$chatId/clear',
+      options: Options(headers: _headers()),
+    );
+  }
+
+  Future<void> deleteDm({required String dmId}) async {
+    await _dio.delete(
+      '/chats/dm/$dmId',
+      options: Options(headers: _headers()),
+    );
+  }
 
   Future<MessageModel> toggleReaction({
     required String chatType,

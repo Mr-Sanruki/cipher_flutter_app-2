@@ -134,7 +134,9 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<void> deleteMessage(String chatId, String messageId) async {
-    state = await AsyncValue.guard(() => _repo.deleteMessage(chatId, messageId));
+    state = await AsyncValue.guard(
+      () => _repo.deleteMessage(chatType: 'dm', chatId: chatId, messageId: messageId),
+    );
   }
 
   Future<void> toggleReaction({

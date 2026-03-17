@@ -132,7 +132,15 @@ authRouter.post('/request-otp', async (req, res) => {
       })
       .catch((err) => {
         // eslint-disable-next-line no-console
-        console.error('[smtp] sendMail error:', err);
+        console.error('[smtp] sendMail error:', {
+          code: err?.code,
+          command: err?.command,
+          message: err?.message,
+          name: err?.name,
+        });
+        if (String(err?.code) === 'ETIMEDOUT') {
+          console.error('[smtp] Hint: Render often blocks outbound SMTP. Use EMAIL_PROVIDER=resend instead.');
+        }
       });
 
     return res.json({ ok: true });

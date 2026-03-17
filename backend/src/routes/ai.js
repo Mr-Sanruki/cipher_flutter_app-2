@@ -4,9 +4,28 @@ const { requireAuth } = require('../middleware/auth');
 const aiRouter = express.Router();
 
 aiRouter.post('/chat', requireAuth, async (req, res) => {
-  const { messages } = req.body;
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'MESSAGES_REQUIRED' });
+  const raw = req.body;
+  const messagesRaw =
+    (raw && Array.isArray(raw.messages) ? raw.messages : null) ||
+    (raw && raw.data && Array.isArray(raw.data.messages) ? raw.data.messages : null) ||
+    (raw && Array.isArray(raw.history) ? raw.history : null) ||
+    [];
+
+  const messages = messagesRaw
+    .map((m) => {
+      if (!m || typeof m !== 'object') return null;
+      const role = String(m.role || '').trim();
+      const content = String(m.content || '').trim();
+      if (!role || !content) return null;
+      return { role, content };
+    })
+    .filter(Boolean);
+
+  if (messages.length === 0) {
+    return res.status(400).json({
+      error: 'MESSAGES_REQUIRED',
+      hint: 'Expected body: { messages: [{ role: "user"|"assistant", content: "..." }] }',
+    });
   }
 
   const apiKey = String(process.env.GROQ_API_KEY || process.env.GROK_API_KEY || '').trim();

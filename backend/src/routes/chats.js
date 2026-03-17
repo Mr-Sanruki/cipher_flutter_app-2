@@ -352,6 +352,68 @@ function createChatsRouter(io) {
 
   router.post('/:chatType/:chatId/messages', requireAuth, async (req, res) => createMessage(req, res));
 
+  router.delete('/:chatType/:chatId/messages/:messageId', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const chatType = String(req.params.chatType || '').trim();
+    const chatId = String(req.params.chatId || '').trim();
+    const messageId = String(req.params.messageId || '').trim();
+
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+    if (!messageId) return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED' });
+
+    const authz = await authorizeChatAccess({ chatType, chatId, userId });
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    const msg = await Message.findOne({ _id: messageId, chatType, chatId });
+    if (!msg) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (String(msg.senderId) !== String(userId)) return res.status(403).json({ error: 'FORBIDDEN' });
+
+    msg.isDeleted = true;
+    msg.content = 'This message was deleted';
+    await msg.save();
+
+    const dto = toMessageDto(msg.toObject());
+    if (io) io.to(roomFor(chatType, chatId)).emit('message:update', dto);
+    return res.json({ ok: true, message: dto });
+  });
+
+  router.post('/:chatType/:chatId/clear', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const chatType = String(req.params.chatType || '').trim();
+    const chatId = String(req.params.chatId || '').trim();
+
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+
+    const authz = await authorizeChatAccess({ chatType, chatId, userId });
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    await Message.updateMany(
+      { chatType, chatId },
+      { $set: { isDeleted: true, content: 'This message was deleted' } }
+    );
+
+    if (io) io.to(roomFor(chatType, chatId)).emit('chat:cleared', { chatType, chatId });
+    return res.json({ ok: true });
+  });
+
+  router.delete('/dm/:dmId', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const dmId = String(req.params.dmId || '').trim();
+    if (!dmId) return res.status(400).json({ error: 'DM_ID_REQUIRED' });
+
+    const dm = await Dm.findById(dmId);
+    if (!dm) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (!(dm.memberIds || []).some((x) => String(x) === String(userId))) {
+      return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    await Message.deleteMany({ chatType: 'dm', chatId: dmId });
+    await Dm.deleteOne({ _id: dmId });
+
+    if (io) io.to(roomFor('dm', dmId)).emit('chat:deleted', { chatType: 'dm', chatId: dmId });
+    return res.json({ ok: true });
+  });
+
   router.get('/:chatType/:chatId/messages/:messageId/threads', requireAuth, async (req, res) => {
     const userId = req.user?.sub;
     const chatType = String(req.params.chatType || '').trim();
