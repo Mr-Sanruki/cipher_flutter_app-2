@@ -83,20 +83,22 @@ class _MessageInputBarState extends State<MessageInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (widget.readOnly) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
-          border: Border(top: BorderSide(color: Colors.grey[200]!)),
+          color: cs.surface,
+          border: Border(top: BorderSide(color: cs.outlineVariant.withAlpha(100))),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline, size: 16, color: Colors.grey[500]),
+            Icon(Icons.lock_outline, size: 16, color: cs.onSurfaceVariant),
             const SizedBox(width: 8),
             Text(widget.readOnlyMessage ?? 'Read only',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
           ],
         ),
       );
@@ -105,8 +107,8 @@ class _MessageInputBarState extends State<MessageInputBar> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: Colors.grey[200]!)),
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant.withAlpha(100))),
       ),
       child: SafeArea(
         child: Row(
@@ -114,7 +116,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
             IconButton(
               icon: const Icon(Icons.add_circle_outline),
               onPressed: _showAttachMenu,
-              color: Colors.grey[600],
+              color: cs.onSurfaceVariant,
             ),
             Expanded(
               child: TextField(
@@ -129,8 +131,8 @@ class _MessageInputBarState extends State<MessageInputBar> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: Colors.grey[100],
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  fillColor: cs.surfaceContainerHighest,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   isDense: true,
                 ),
                 onSubmitted: (_) => _send(),
@@ -144,7 +146,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
                       key: const ValueKey('send'),
                       onPressed: _send,
                       icon: const Icon(Icons.send_rounded),
-                      color: const Color(0xFF6C63FF),
+                      color: cs.primary,
                     )
                   : const SizedBox(width: 48, key: ValueKey('empty')),
             ),
