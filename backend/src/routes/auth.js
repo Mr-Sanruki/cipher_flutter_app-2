@@ -57,6 +57,48 @@ authRouter.post('/request-otp', async (req, res) => {
 
   try {
     const provider = String(process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
+    if (provider === 'brevo') {
+      const apiKey = String(process.env.BREVO_API_KEY || '').trim();
+      const fromEmail = String(process.env.BREVO_FROM_EMAIL || '').trim();
+      const fromName = String(process.env.BREVO_FROM_NAME || 'Cipher').trim();
+      if (!apiKey) return res.status(500).json({ error: 'BREVO_API_KEY_MISSING' });
+      if (!fromEmail) return res.status(500).json({ error: 'BREVO_FROM_EMAIL_MISSING' });
+
+      setImmediate(async () => {
+        try {
+          const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+              'api-key': apiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+              sender: { name: fromName, email: fromEmail },
+              to: [{ email }],
+              subject: 'Your Cipher login code',
+              textContent: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
+            }),
+          });
+
+          if (!resp.ok) {
+            const t = await resp.text().catch(() => '');
+            // eslint-disable-next-line no-console
+            console.error('[brevo] send error:', resp.status, t);
+            return;
+          }
+
+          const data = await resp.json().catch(() => ({}));
+          // eslint-disable-next-line no-console
+          console.log('[brevo] send ok:', data?.messageId || data);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[brevo] send exception:', err);
+        }
+      });
+
+      return res.json({ ok: true });
+    }
     if (provider === 'resend') {
       const apiKey = process.env.RESEND_API_KEY;
       const from = process.env.RESEND_FROM_EMAIL;
