@@ -166,7 +166,15 @@ function createChatsRouter(io) {
     const workspaceId = authz.workspaceId;
 
     if (chatType === 'dm') {
-      await Dm.updateOne({ _id: chatId }, { $set: { lastMessage: content, lastMessageAt: new Date() } });
+      const nowForDm = new Date();
+      await Dm.updateOne({ _id: chatId }, { $set: { lastMessage: content, lastMessageAt: nowForDm } });
+
+      // If any participant hid this DM, a new message should make it appear again.
+      const dm = await Dm.findById(chatId).lean();
+      const memberIds = (dm?.memberIds || []).map((x) => String(x));
+      if (memberIds.length > 0) {
+        await ChatHide.deleteMany({ chatType: 'dm', chatId, userId: { $in: memberIds } });
+      }
     }
 
     const now = new Date();
@@ -305,6 +313,20 @@ function createChatsRouter(io) {
     return res.json({ items: filtered.map(toDmDto) });
   });
 
+  router.get('/dm/:dmId', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const dmId = String(req.params.dmId || '').trim();
+    if (!dmId) return res.status(400).json({ error: 'DM_ID_REQUIRED' });
+
+    const dm = await Dm.findById(dmId).lean();
+    if (!dm) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (!(dm.memberIds || []).some((x) => String(x) === String(userId))) {
+      return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    return res.json({ dm: toDmDto(dm) });
+  });
+
   router.post('/dms', requireAuth, async (req, res) => {
     const userId = req.user?.sub;
     const workspaceId = String(req.body?.workspaceId || '').trim();
@@ -320,6 +342,9 @@ function createChatsRouter(io) {
     if (!dm) {
       dm = await Dm.create({ workspaceId, memberIds: ids, memberKey });
     }
+
+    // If this user previously hid the DM, starting/opening it should unhide it.
+    await ChatHide.deleteMany({ userId, chatType: 'dm', chatId: String(dm._id) });
 
     return res.json({ dm: toDmDto(dm.toObject()) });
   });

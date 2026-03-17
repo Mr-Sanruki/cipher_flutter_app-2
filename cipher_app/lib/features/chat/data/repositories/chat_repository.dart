@@ -23,6 +23,7 @@ class ChatRepository {
   sio.Socket? _socket;
   Timer? _socketRetryTimer;
   final _incomingCallController = StreamController<Map<String, String>>.broadcast();
+  final _callEventController = StreamController<Map<String, String>>.broadcast();
   final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
   final Map<String, List<MessageModel>> _messageCache = {};
 
@@ -88,6 +89,28 @@ class ChatRepository {
       } catch (_) {}
     });
 
+    s.on('call:accepted', (payload) {
+      try {
+        if (payload is! Map) return;
+        final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
+        final callId = (payload['callId'] ?? '').toString().trim();
+        final callType = (payload['callType'] ?? 'voice').toString().trim();
+        if (fromUserId.isEmpty || callId.isEmpty) return;
+        _callEventController.add({'event': 'accepted', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
+      } catch (_) {}
+    });
+
+    s.on('call:declined', (payload) {
+      try {
+        if (payload is! Map) return;
+        final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
+        final callId = (payload['callId'] ?? '').toString().trim();
+        final callType = (payload['callType'] ?? 'voice').toString().trim();
+        if (fromUserId.isEmpty || callId.isEmpty) return;
+        _callEventController.add({'event': 'declined', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
+      } catch (_) {}
+    });
+
     s.connect();
     _socket = s;
   }
@@ -105,6 +128,11 @@ class ChatRepository {
     });
     _ensureSocketConnected();
     return _incomingCallController.stream;
+  }
+
+  Stream<Map<String, String>> callEvents() {
+    _ensureSocketConnected();
+    return _callEventController.stream;
   }
 
   void sendCallInvite({required String toUserId, required String callId, String callType = 'voice'}) {
@@ -263,6 +291,24 @@ class ChatRepository {
   }
 
   // ─── DMs ─────────────────────────────────────────────────────
+  Future<DmModel> getDmById({required String dmId}) async {
+    try {
+      final res = await _dio.get(
+        '/chats/dm/$dmId',
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['dm'] is Map) {
+        return DmModel.fromJson(Map<String, dynamic>.from(data['dm']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
   Future<DmModel> getOrCreateDm({
     required String workspaceId,
     required String otherUserId,

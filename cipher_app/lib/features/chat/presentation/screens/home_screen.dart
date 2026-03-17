@@ -420,15 +420,15 @@ class _DmsTab extends ConsumerWidget {
                 itemBuilder: (context, i) {
                   final dm = dms[i];
                   final myId = ref.read(backendUserIdProvider);
-                  final otherId = myId != null ? dm.otherUserId(myId) : 'User';
-                  final otherUserAsync = myId != null ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
+                  final otherId = myId != null ? dm.otherUserId(myId) : '';
+                  final otherUserAsync = otherId.isNotEmpty ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: Colors.blue.shade100,
                       child: Icon(Icons.person_outline, color: Colors.blue.shade700),
                     ),
                     title: Text(
-                      otherUserAsync.value?.name ?? otherId,
+                      otherUserAsync.value?.name ?? 'User',
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                     subtitle: dm.lastMessage != null
