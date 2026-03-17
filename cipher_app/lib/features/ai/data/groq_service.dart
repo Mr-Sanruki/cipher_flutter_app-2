@@ -1,8 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/config/app_config_provider.dart';
 
-final groqServiceProvider = Provider<GroqService>((ref) => GroqService());
+final groqServiceProvider = Provider<GroqService>((ref) {
+  final cfg = ref.watch(appConfigProvider);
+  final key = cfg.groqApiKey.isNotEmpty ? cfg.groqApiKey : AppConstants.effectiveGroqApiKey;
+  return GroqService(apiKey: key);
+});
 
 class GroqMessage {
   final String role;
@@ -13,12 +18,13 @@ class GroqMessage {
 
 class GroqService {
   late final Dio _dio;
+  final String _apiKey;
 
-  GroqService() {
+  GroqService({required String apiKey}) : _apiKey = apiKey {
     _dio = Dio(BaseOptions(
       baseUrl: AppConstants.groqBaseUrl,
       headers: {
-        if (AppConstants.groqApiKey.isNotEmpty) 'Authorization': 'Bearer ${AppConstants.groqApiKey}',
+        if (_apiKey.isNotEmpty) 'Authorization': 'Bearer $_apiKey',
         'Content-Type': 'application/json',
       },
       connectTimeout: const Duration(seconds: 30),
@@ -27,8 +33,8 @@ class GroqService {
   }
 
   Future<String> chat(List<GroqMessage> messages) async {
-    if (AppConstants.groqApiKey.isEmpty) {
-      throw Exception('Missing GROQ_API_KEY. Run with --dart-define=GROQ_API_KEY=...');
+    if (_apiKey.isEmpty) {
+      throw Exception('Missing GROQ_API_KEY. Set it in Settings > AI Assistant.');
     }
     final response = await _dio.post('/chat/completions', data: {
       'model': AppConstants.groqModel,

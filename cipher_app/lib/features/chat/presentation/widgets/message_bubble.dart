@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/models/message_model.dart';
 import '../providers/chat_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -184,38 +185,56 @@ class MessageBubble extends ConsumerWidget {
     final textColor = isMe ? Colors.white : Colors.black87;
     switch (message.type) {
       case MessageType.image:
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
-            imageUrl: message.fileUrl ?? '',
-            width: 200,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => const SizedBox(
-                height: 120, child: Center(child: CircularProgressIndicator())),
+        return InkWell(
+          onTap: () async {
+            final url = message.fileUrl;
+            if (url == null || url.isEmpty) return;
+            final uri = Uri.tryParse(url);
+            if (uri == null) return;
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: message.fileUrl ?? '',
+              width: 200,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const SizedBox(
+                  height: 120, child: Center(child: CircularProgressIndicator())),
+            ),
           ),
         );
       case MessageType.file:
       case MessageType.video:
       case MessageType.audio:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(_fileIcon(message.type), color: isMe ? Colors.white70 : Colors.grey[600], size: 20),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(message.fileName ?? message.content,
-                      style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis),
-                  if (message.fileSize != null)
-                    Text(message.fileSize!,
-                        style: TextStyle(color: isMe ? Colors.white60 : Colors.grey[500], fontSize: 11)),
-                ],
+        return InkWell(
+          onTap: () async {
+            final url = message.fileUrl;
+            if (url == null || url.isEmpty) return;
+            final uri = Uri.tryParse(url);
+            if (uri == null) return;
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_fileIcon(message.type), color: isMe ? Colors.white70 : Colors.grey[600], size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(message.fileName ?? message.content,
+                        style: TextStyle(color: textColor, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis),
+                    if (message.fileSize != null)
+                      Text(message.fileSize!,
+                          style: TextStyle(color: isMe ? Colors.white60 : Colors.grey[500], fontSize: 11)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       default:
         return Text(message.content, style: TextStyle(color: textColor, fontSize: 15));

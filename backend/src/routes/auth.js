@@ -57,6 +57,47 @@ authRouter.post('/request-otp', async (req, res) => {
 
   try {
     const provider = String(process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
+    if (provider === 'resend') {
+      const apiKey = process.env.RESEND_API_KEY;
+      const from = process.env.RESEND_FROM_EMAIL;
+      if (!apiKey) return res.status(500).json({ error: 'RESEND_API_KEY_MISSING' });
+      if (!from) return res.status(500).json({ error: 'RESEND_FROM_EMAIL_MISSING' });
+
+      setImmediate(async () => {
+        try {
+          const resp = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from,
+              to: email,
+              subject: 'Your Cipher login code',
+              text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
+            }),
+          });
+
+          if (!resp.ok) {
+            const t = await resp.text().catch(() => '');
+            // eslint-disable-next-line no-console
+            console.error('[resend] send error:', resp.status, t);
+            return;
+          }
+
+          const data = await resp.json().catch(() => ({}));
+          // eslint-disable-next-line no-console
+          console.log('[resend] send ok:', data?.id || data);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[resend] send exception:', err);
+        }
+      });
+
+      return res.json({ ok: true });
+    }
+
     if (provider !== 'smtp') {
       return res.status(500).json({ error: 'EMAIL_PROVIDER_UNSUPPORTED' });
     }
@@ -78,15 +119,22 @@ authRouter.post('/request-otp', async (req, res) => {
       auth: { user, pass },
     });
 
-    const info = await transporter.sendMail({
-      from,
-      to: email,
-      subject: 'Your Cipher login code',
-      text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
-    });
+    transporter
+      .sendMail({
+        from,
+        to: email,
+        subject: 'Your Cipher login code',
+        text: `Your Cipher login code is: ${code}. It expires in ${Math.floor(ttlSeconds / 60)} minutes.`,
+      })
+      .then((info) => {
+        // eslint-disable-next-line no-console
+        console.log('[smtp] sendMail info:', info?.messageId || info);
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[smtp] sendMail error:', err);
+      });
 
-    // eslint-disable-next-line no-console
-    console.log('[smtp] sendMail info:', info?.messageId || info);
     return res.json({ ok: true });
   } catch (err) {
     // eslint-disable-next-line no-console

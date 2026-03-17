@@ -2,13 +2,74 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/config/app_config_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
+  Future<void> _editBackendUrl(BuildContext context, WidgetRef ref) async {
+    final cfg = ref.read(appConfigProvider);
+    final ctrl = TextEditingController(text: cfg.backendBaseUrl);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Backend URL'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            hintText: 'http://192.168.x.x:8080',
+          ),
+          keyboardType: TextInputType.url,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final v = ctrl.text.trim();
+              if (v.isNotEmpty) {
+                await ref.read(appConfigProvider.notifier).setBackendBaseUrl(v);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editGroqKey(BuildContext context, WidgetRef ref) async {
+    final cfg = ref.read(appConfigProvider);
+    final ctrl = TextEditingController(text: cfg.groqApiKey);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Groq API Key'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            hintText: 'gsk_...',
+          ),
+          obscureText: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              await ref.read(appConfigProvider.notifier).setGroqApiKey(ctrl.text);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(currentUserProvider);
+    final cfg = ref.watch(appConfigProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -71,6 +132,18 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             _sectionTitle('Support'),
+            _settingsTile(
+              icon: Icons.link_outlined,
+              title: 'Backend URL',
+              subtitle: cfg.backendBaseUrl,
+              onTap: () => _editBackendUrl(context, ref),
+            ),
+            _settingsTile(
+              icon: Icons.vpn_key_outlined,
+              title: 'Groq API Key',
+              subtitle: cfg.groqApiKey.isNotEmpty ? 'Configured' : 'Not set',
+              onTap: () => _editGroqKey(context, ref),
+            ),
             _settingsTile(
               icon: Icons.smart_toy_outlined,
               title: 'AI Assistant',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
@@ -73,7 +74,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           IconButton(
             icon: const Icon(Icons.search_outlined),
             onPressed: () {
-              Navigator.of(context).pushNamed('/chat-search/channel/${widget.channelId}');
+              context.push('/chat-search/channel/${widget.channelId}');
             },
           ),
         ],

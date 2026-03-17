@@ -2,20 +2,21 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/workspace_model.dart';
-import '../../../../core/constants/app_constants.dart';
+import '../../../../core/config/app_config_provider.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 
 final workspaceRepositoryProvider = Provider<WorkspaceRepository>((ref) {
-  return WorkspaceRepository(ref.watch(authRepositoryProvider));
+  final cfg = ref.watch(appConfigProvider);
+  return WorkspaceRepository(ref.watch(authRepositoryProvider), baseUrl: cfg.backendBaseUrl);
 });
 
 class WorkspaceRepository {
   final AuthRepository _authRepo;
   final Dio _dio;
 
-  WorkspaceRepository(this._authRepo)
+  WorkspaceRepository(this._authRepo, {required String baseUrl})
       : _dio = Dio(BaseOptions(
-          baseUrl: AppConstants.backendBaseUrl,
+          baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 20),
           receiveTimeout: const Duration(seconds: 30),
           headers: {'Content-Type': 'application/json'},

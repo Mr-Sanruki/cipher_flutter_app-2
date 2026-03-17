@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import '../providers/call_provider.dart';
+import '../../../auth/presentation/providers/user_lookup_provider.dart';
 
 class VoiceCallScreen extends ConsumerStatefulWidget {
   final String callId;
@@ -26,7 +27,7 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
 
   Future<void> _initCall() async {
     try {
-      final streamVideo = ref.read(streamVideoProvider);
+      final streamVideo = await ref.read(streamVideoProvider.future);
       _call = streamVideo.makeCall(callType: StreamCallType.defaultType(), id: widget.callId);
       await _call!.getOrCreate();
       await _call!.join();
@@ -37,7 +38,7 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
     } catch (e) {
       setState(() {
         _isConnecting = false;
-        _status = 'Failed to connect';
+        _status = 'Failed to connect: $e';
       });
     }
   }
@@ -64,6 +65,8 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userAsync = ref.watch(userByIdProvider(widget.callId));
+    final user = userAsync.value;
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A2E),
       body: SafeArea(
@@ -76,14 +79,19 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 40),
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 50,
-                    backgroundColor: Color(0xFF6C63FF),
-                    child: Icon(Icons.person, size: 50, color: Colors.white),
+                    backgroundColor: const Color(0xFF6C63FF),
+                    backgroundImage: user?.avatarUrl != null && (user!.avatarUrl ?? '').isNotEmpty
+                        ? NetworkImage(user.avatarUrl!)
+                        : null,
+                    child: (user?.avatarUrl == null || (user!.avatarUrl ?? '').isEmpty)
+                        ? const Icon(Icons.person, size: 50, color: Colors.white)
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.callId,
+                    user?.name ?? widget.callId,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
@@ -92,7 +100,8 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
                     children: [
                       if (_isConnecting)
                         const SizedBox(
-                          width: 14, height: 14,
+                          width: 14,
+                          height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
                         ),
                       if (_isConnecting) const SizedBox(width: 8),

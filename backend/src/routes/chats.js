@@ -256,6 +256,29 @@ function createChatsRouter(io) {
     return res.status(201).json({ group: toGroupDto(g.toObject()) });
   });
 
+  router.post('/groups/:groupId/members', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const groupId = String(req.params.groupId || '').trim();
+    const memberIds = Array.isArray(req.body?.memberIds) ? req.body.memberIds.map(String) : [];
+
+    if (!groupId) return res.status(400).json({ error: 'GROUP_ID_REQUIRED' });
+    if (memberIds.length === 0) return res.status(400).json({ error: 'MEMBER_IDS_REQUIRED' });
+
+    const g = await Group.findById(groupId);
+    if (!g) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (!(g.memberIds || []).some((x) => String(x) === String(userId))) {
+      return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    const unique = [...new Set([String(userId), ...memberIds.map(String)])];
+    const current = (g.memberIds || []).map((x) => String(x));
+    const next = [...new Set([...current, ...unique])];
+    g.memberIds = next;
+    await g.save();
+
+    return res.json({ group: toGroupDto(g.toObject()) });
+  });
+
   // DMs
   router.get('/dms', requireAuth, async (req, res) => {
     const userId = req.user?.sub;

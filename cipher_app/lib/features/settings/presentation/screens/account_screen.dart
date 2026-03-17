@@ -36,6 +36,7 @@ class AccountScreen extends ConsumerWidget {
                 await ref.read(authRepositoryProvider).updateUser(
                   user.copyWith(notificationsEnabled: v),
                 );
+                ref.invalidate(currentUserProvider);
               },
             ),
             loading: () => const SizedBox.shrink(),

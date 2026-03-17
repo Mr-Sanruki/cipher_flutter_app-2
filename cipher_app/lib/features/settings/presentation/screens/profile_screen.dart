@@ -15,13 +15,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _bioCtrl;
   bool _loading = false;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    final user = ref.read(currentUserProvider).value;
-    _nameCtrl = TextEditingController(text: user?.name ?? '');
-    _bioCtrl = TextEditingController(text: user?.bio ?? '');
+    _nameCtrl = TextEditingController();
+    _bioCtrl = TextEditingController();
   }
 
   @override
@@ -39,6 +39,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await ref.read(authRepositoryProvider).updateUser(
         user.copyWith(name: _nameCtrl.text.trim(), bio: _bioCtrl.text.trim()),
       );
+      ref.invalidate(currentUserProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated!')),
@@ -59,6 +60,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (user == null) return;
       final url = await ref.read(authRepositoryProvider).uploadAvatar(image.path);
       await ref.read(authRepositoryProvider).updateUser(user.copyWith(avatarUrl: url));
+      ref.invalidate(currentUserProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Avatar updated!')),
@@ -88,7 +90,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (user) => ListView(
+        data: (user) {
+          if (!_initialized && user != null) {
+            _nameCtrl.text = user.name;
+            _bioCtrl.text = user.bio ?? '';
+            _initialized = true;
+          }
+
+          return ListView(
           padding: const EdgeInsets.all(24),
           children: [
             Center(
@@ -97,10 +106,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: const Color(0xFF6C63FF),
-                    child: Text(
-                      user?.name[0].toUpperCase() ?? 'U',
-                      style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
-                    ),
+                    backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                        ? NetworkImage(user.avatarUrl!)
+                        : null,
+                    child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                        ? Text(
+                            (user?.name ?? '').isNotEmpty
+                                ? (user!.name[0].toUpperCase())
+                                : 'U',
+                            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+                          )
+                        : null,
                   ),
                   Positioned(
                     bottom: 0,
@@ -142,7 +158,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Text('Email: ${user?.email ?? ''}',
                 style: TextStyle(color: Colors.grey[500], fontSize: 13)),
           ],
-        ),
+          );
+        },
       ),
     );
   }

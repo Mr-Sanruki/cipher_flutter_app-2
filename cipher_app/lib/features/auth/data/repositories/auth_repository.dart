@@ -1,18 +1,46 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/user_model.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/config/app_config_provider.dart';
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository());
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  final cfg = ref.watch(appConfigProvider);
+  return AuthRepository(baseUrl: cfg.backendBaseUrl);
+});
 
 class AuthRepository {
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: AppConstants.backendBaseUrl,
-    connectTimeout: const Duration(seconds: 20),
-    receiveTimeout: const Duration(seconds: 30),
-    headers: {'Content-Type': 'application/json'},
-  ));
+  final Dio _dio;
+
+  AuthRepository({required String baseUrl})
+      : _dio = Dio(BaseOptions(
+          baseUrl: baseUrl,
+          connectTimeout: const Duration(seconds: 20),
+          receiveTimeout: const Duration(seconds: 30),
+          headers: {'Content-Type': 'application/json'},
+        )) {
+    debugPrint('[auth] baseUrl=${_dio.options.baseUrl}');
+  }
+
+  Future<String> getStreamUserToken() async {
+    try {
+      final res = await _dio.get(
+        '/calls/token',
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['token'] is String && (data['token'] as String).isNotEmpty) {
+        return data['token'] as String;
+      }
+      throw Exception('Invalid token response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 
   Map<String, String> _headers() {
     final jwt = getSavedToken();
@@ -51,7 +79,13 @@ class AuthRepository {
   }
 
   Future<void> sendOtp(String email) async {
-    await _dio.post('/auth/request-otp', data: {'email': email});
+    try {
+      final res = await _dio.post('/auth/request-otp', data: {'email': email});
+      debugPrint('[auth] request-otp ok status=${res.statusCode} uri=${res.requestOptions.uri}');
+    } on DioException catch (e) {
+      debugPrint('[auth] request-otp error type=${e.type} message=${e.message} uri=${e.requestOptions.uri}');
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> verifyOtp({required String email, required String code}) async {

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/chat_provider.dart';
+import '../../data/repositories/chat_repository.dart';
 import '../../../workspace/presentation/providers/workspace_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/data/repositories/auth_repository.dart';
+import '../../../auth/presentation/providers/user_lookup_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -269,34 +272,97 @@ class _ChannelsTab extends ConsumerWidget {
 class _DmsTab extends ConsumerWidget {
   const _DmsTab();
 
+  Future<void> _showNewDmPicker(BuildContext context, WidgetRef ref) async {
+    final ws = ref.read(selectedWorkspaceProvider);
+    final myId = ref.read(backendUserIdProvider);
+    if (ws == null || myId == null) return;
+
+    final members = await ref.read(authRepositoryProvider).getUsersByIds(ws.memberIds);
+    final candidates = members.where((u) => u.id != myId).toList();
+
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Text('Start a DM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            if (candidates.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Text('No other members in this workspace.'),
+              ),
+            for (final u in candidates)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.blue.shade100,
+                  child: Text(
+                    u.name.isNotEmpty ? u.name[0].toUpperCase() : 'U',
+                    style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                title: Text(u.name, overflow: TextOverflow.ellipsis),
+                subtitle: Text(u.email, overflow: TextOverflow.ellipsis),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final dm = await ref.read(chatRepositoryProvider).getOrCreateDm(
+                        workspaceId: ws.id,
+                        otherUserId: u.id,
+                      );
+                  if (context.mounted) context.push('/dm/${dm.id}');
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dmsAsync = ref.watch(dmsProvider);
-    return dmsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (dms) => dms.isEmpty
-          ? _emptyState(context, 'No direct messages', Icons.chat_bubble_outline)
-          : ListView.builder(
-              itemCount: dms.length,
-              itemBuilder: (context, i) {
-                final dm = dms[i];
-                final myId = ref.read(backendUserIdProvider);
-                final otherId = myId != null ? dm.otherUserId(myId) : 'User';
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blue.shade100,
-                    child: Icon(Icons.person_outline, color: Colors.blue.shade700),
-                  ),
-                  title: Text(otherId, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  subtitle: dm.lastMessage != null
-                      ? Text(dm.lastMessage!, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.grey[500], fontSize: 12))
-                      : null,
-                  onTap: () => context.push('/dm/${dm.id}'),
-                );
-              },
-            ),
+    return Scaffold(
+      body: dmsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (dms) => dms.isEmpty
+            ? _emptyState(context, 'No direct messages', Icons.chat_bubble_outline)
+            : ListView.builder(
+                itemCount: dms.length,
+                itemBuilder: (context, i) {
+                  final dm = dms[i];
+                  final myId = ref.read(backendUserIdProvider);
+                  final otherId = myId != null ? dm.otherUserId(myId) : 'User';
+                  final otherUserAsync = myId != null ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blue.shade100,
+                      child: Icon(Icons.person_outline, color: Colors.blue.shade700),
+                    ),
+                    title: Text(
+                      otherUserAsync.value?.name ?? otherId,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: dm.lastMessage != null
+                        ? Text(dm.lastMessage!, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.grey[500], fontSize: 12))
+                        : null,
+                    onTap: () => context.push('/dm/${dm.id}'),
+                  );
+                },
+              ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'home_dms_fab',
+        onPressed: () => _showNewDmPicker(context, ref),
+        child: const Icon(Icons.chat_bubble_outline),
+      ),
     );
   }
 }

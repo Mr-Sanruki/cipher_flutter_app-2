@@ -5,7 +5,11 @@ import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
 import '../../data/models/message_model.dart';
+import '../../data/repositories/chat_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/data/repositories/auth_repository.dart';
+import '../../../auth/presentation/providers/user_lookup_provider.dart';
+import '../../../workspace/presentation/providers/workspace_provider.dart';
 
 class GroupScreen extends ConsumerStatefulWidget {
   final String groupId;
@@ -83,8 +87,13 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
           IconButton(
             icon: const Icon(Icons.search_outlined),
             onPressed: () {
-              Navigator.of(context).pushNamed('/chat-search/group/${widget.groupId}');
+              context.push('/chat-search/group/${widget.groupId}');
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+            onPressed: () => _showAddMembers(context, group?.memberIds ?? const []),
+            tooltip: 'Add members',
           ),
           IconButton(
             icon: const Icon(Icons.call_outlined),
@@ -136,13 +145,94 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
           children: [
             const Text('Members', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            ...memberIds.map((id) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.green.shade100,
-                    child: Icon(Icons.person_outline, color: Colors.green.shade700),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: memberIds.map((id) {
+                  final uAsync = ref.watch(userByIdProvider(id));
+                  final u = uAsync.value;
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.green.shade100,
+                      backgroundImage: u?.avatarUrl != null && (u!.avatarUrl ?? '').isNotEmpty
+                          ? NetworkImage(u.avatarUrl!)
+                          : null,
+                      child: (u?.avatarUrl == null || (u!.avatarUrl ?? '').isEmpty)
+                          ? Icon(Icons.person_outline, color: Colors.green.shade700)
+                          : null,
+                    ),
+                    title: Text(u?.name ?? id),
+                    subtitle: u?.email != null ? Text(u!.email, overflow: TextOverflow.ellipsis) : null,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAddMembers(BuildContext context, List<String> existingMemberIds) async {
+    final ws = ref.read(selectedWorkspaceProvider);
+    final myId = ref.read(backendUserIdProvider);
+    if (ws == null || myId == null) return;
+
+    final members = await ref.read(authRepositoryProvider).getUsersByIds(ws.memberIds);
+    final existing = existingMemberIds.toSet();
+    final candidates = members.where((u) => !existing.contains(u.id)).toList();
+
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Text('Add members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            if (candidates.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Text('Everyone is already in this group.'),
+              ),
+            for (final u in candidates)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.green.shade100,
+                  child: Text(
+                    u.name.isNotEmpty ? u.name[0].toUpperCase() : 'U',
+                    style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w700),
                   ),
-                  title: Text(id),
-                )),
+                ),
+                title: Text(u.name, overflow: TextOverflow.ellipsis),
+                subtitle: Text(u.email, overflow: TextOverflow.ellipsis),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ref.read(chatRepositoryProvider).addMembersToGroup(
+                          groupId: widget.groupId,
+                          memberIds: [u.id],
+                        );
+                    ref.invalidate(groupsProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Added ${u.name}')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+            const SizedBox(height: 8),
           ],
         ),
       ),

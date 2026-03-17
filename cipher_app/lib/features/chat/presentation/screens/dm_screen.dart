@@ -5,6 +5,7 @@ import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/presentation/providers/user_lookup_provider.dart';
 import '../../data/models/message_model.dart';
 
 class DmScreen extends ConsumerStatefulWidget {
@@ -52,6 +53,8 @@ class _DmScreenState extends ConsumerState<DmScreen> {
     final myId = ref.watch(backendUserIdProvider);
     final dm = dmsAsync.value?.firstWhere((d) => d.id == widget.dmId, orElse: () => dmsAsync.value!.first);
     final otherId = dm != null && myId != null ? dm.otherUserId(myId) : 'User';
+    final otherUserAsync = myId != null ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
+    final otherUser = otherUserAsync.value;
 
     return Scaffold(
       appBar: AppBar(
@@ -60,17 +63,25 @@ class _DmScreenState extends ConsumerState<DmScreen> {
             CircleAvatar(
               backgroundColor: Colors.blue.shade100,
               radius: 16,
-              child: Icon(Icons.person_outline, color: Colors.blue.shade700, size: 18),
+              backgroundImage: otherUser?.avatarUrl != null && (otherUser!.avatarUrl ?? '').isNotEmpty
+                  ? NetworkImage(otherUser.avatarUrl!)
+                  : null,
+              child: (otherUser?.avatarUrl == null || (otherUser!.avatarUrl ?? '').isEmpty)
+                  ? Icon(Icons.person_outline, color: Colors.blue.shade700, size: 18)
+                  : null,
             ),
             const SizedBox(width: 8),
-            Text(otherId, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              otherUser?.name ?? otherId,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.search_outlined),
             onPressed: () {
-              Navigator.of(context).pushNamed('/chat-search/dm/${widget.dmId}');
+              context.push('/chat-search/dm/${widget.dmId}');
             },
           ),
           IconButton(

@@ -14,6 +14,7 @@ const { workspacesRouter } = require('./routes/workspaces');
 const { notificationsRouter } = require('./routes/notifications');
 const { uploadsRouter, UPLOAD_ROOT } = require('./routes/uploads');
 const { createChatsRouter, roomFor } = require('./routes/chats');
+const { callsRouter } = require('./routes/calls');
 const { verifyJwtToken } = require('./middleware/auth');
 
 async function start() {
@@ -47,6 +48,7 @@ async function start() {
   app.use('/notifications', notificationsRouter);
   app.use('/uploads', uploadsRouter);
   app.use('/static', express.static(UPLOAD_ROOT));
+  app.use('/calls', callsRouter);
 
   const server = http.createServer(app);
 
@@ -92,9 +94,9 @@ async function start() {
   app.use('/chats', createChatsRouter(io));
 
   const port = Number(process.env.PORT || 8080);
-  server.listen(port, () => {
+  server.listen(port, '0.0.0.0', () => {
     // eslint-disable-next-line no-console
-    console.log(`Backend listening on http://localhost:${port}`);
+    console.log(`Backend listening on http://0.0.0.0:${port} (LAN) and http://localhost:${port}`);
   });
 }
 

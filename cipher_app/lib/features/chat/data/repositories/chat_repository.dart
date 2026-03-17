@@ -7,24 +7,27 @@ import '../models/message_model.dart';
 import '../models/channel_model.dart';
 import '../models/group_model.dart';
 import '../models/dm_model.dart';
-import '../../../../core/constants/app_constants.dart';
+import '../../../../core/config/app_config_provider.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
-  return ChatRepository(ref.watch(authRepositoryProvider));
+  final cfg = ref.watch(appConfigProvider);
+  return ChatRepository(ref.watch(authRepositoryProvider), baseUrl: cfg.backendBaseUrl);
 });
 
 class ChatRepository {
   final AuthRepository _authRepo;
   final Dio _dio;
+  final String _baseUrl;
 
   sio.Socket? _socket;
   final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
   final Map<String, List<MessageModel>> _messageCache = {};
 
-  ChatRepository(this._authRepo)
-      : _dio = Dio(BaseOptions(
-          baseUrl: AppConstants.backendBaseUrl,
+  ChatRepository(this._authRepo, {required String baseUrl})
+      : _baseUrl = baseUrl,
+        _dio = Dio(BaseOptions(
+          baseUrl: baseUrl,
           connectTimeout: const Duration(seconds: 20),
           receiveTimeout: const Duration(seconds: 30),
           headers: {'Content-Type': 'application/json'},
@@ -42,7 +45,7 @@ class ChatRepository {
     if (token == null) return;
 
     final s = sio.io(
-      AppConstants.backendBaseUrl,
+      _baseUrl,
       sio.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
@@ -77,6 +80,28 @@ class ChatRepository {
       final data = res.data;
       if (data is Map && data['channel'] is Map) {
         return ChannelModel.fromJson(Map<String, dynamic>.from(data['channel']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
+  Future<GroupModel> addMembersToGroup({
+    required String groupId,
+    required List<String> memberIds,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/chats/groups/$groupId/members',
+        data: {'memberIds': memberIds},
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['group'] is Map) {
+        return GroupModel.fromJson(Map<String, dynamic>.from(data['group']));
       }
       throw Exception('Invalid response');
     } on DioException catch (e) {
