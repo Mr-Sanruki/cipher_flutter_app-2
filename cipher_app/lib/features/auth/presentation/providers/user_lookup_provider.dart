@@ -7,6 +7,9 @@ final userByIdProvider = FutureProvider.family.autoDispose<UserModel?, String>((
   final id = userId.trim();
   if (id.isEmpty) return null;
 
+  final isObjectId = RegExp(r'^[a-fA-F0-9]{24}$').hasMatch(id);
+  if (!isObjectId) return null;
+
   final t = Timer(const Duration(seconds: 20), () {
     ref.invalidateSelf();
   });

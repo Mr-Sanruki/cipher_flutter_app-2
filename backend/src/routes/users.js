@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 
 const { requireAuth } = require('../middleware/auth');
 const { User } = require('../models/User');
@@ -22,7 +23,9 @@ function toUserDto(u) {
 
 usersRouter.post('/bulk', requireAuth, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids.map((x) => String(x)) : [];
-  const uniq = Array.from(new Set(ids)).filter((x) => x);
+  const uniq = Array.from(new Set(ids))
+    .map((x) => String(x || '').trim())
+    .filter((x) => x && mongoose.Types.ObjectId.isValid(x));
   if (uniq.length === 0) return res.json({ items: [] });
 
   const users = await User.find({ _id: { $in: uniq } }).lean();
