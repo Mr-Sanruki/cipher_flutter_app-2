@@ -57,42 +57,6 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
         speakerDefaultOn: true,
         screenShare: TrackOption.disabled(),
       ),
-      callContentBuilder: (context, call, callState) {
-        final local = callState.localParticipant;
-        if (local == null) {
-          return StreamCallContent(
-            call: call,
-            callState: callState,
-            pictureInPictureConfiguration: const PictureInPictureConfiguration(
-              enablePictureInPicture: false,
-            ),
-          );
-        }
-
-        return StreamCallContent(
-          call: call,
-          callState: callState,
-          pictureInPictureConfiguration: const PictureInPictureConfiguration(
-            enablePictureInPicture: false,
-            disablePictureInPictureWhenScreenSharing: true,
-          ),
-          callControlsBuilder: (context, call, callState) {
-            final localParticipant = callState.localParticipant;
-            if (localParticipant == null) return const SizedBox.shrink();
-
-            final base = defaultCallControlOptions(
-              call: call,
-              localParticipant: localParticipant,
-            );
-
-            return StreamCallControls(
-              options: [
-                ...base,
-              ],
-            );
-          },
-        );
-      },
       pictureInPictureConfiguration: const PictureInPictureConfiguration(
         enablePictureInPicture: false,
       ),
