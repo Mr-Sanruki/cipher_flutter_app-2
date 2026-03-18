@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true },
+    passwordHash: { type: String },
     avatarUrl: { type: String },
     bio: { type: String },
     workspaceIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },

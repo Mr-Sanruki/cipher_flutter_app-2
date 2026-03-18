@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
@@ -129,6 +130,80 @@ function signJwt(user) {
     { expiresIn: '30d' }
   );
 }
+
+function hashPassword(password) {
+  const iterations = 120000;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const dk = crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('hex');
+  return `pbkdf2_sha256$${iterations}$${salt}$${dk}`;
+}
+
+function verifyPassword(password, passwordHash) {
+  const raw = String(passwordHash || '').trim();
+  const parts = raw.split('$');
+  if (parts.length !== 4) return false;
+  const [algo, iterStr, salt, hash] = parts;
+  if (algo !== 'pbkdf2_sha256') return false;
+  const iterations = Number(iterStr);
+  if (!Number.isFinite(iterations) || iterations <= 0) return false;
+  if (!salt || !hash) return false;
+  const dk = crypto.pbkdf2Sync(String(password), salt, iterations, 32, 'sha256').toString('hex');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(dk, 'hex'), Buffer.from(hash, 'hex'));
+  } catch (_) {
+    return false;
+  }
+}
+
+authRouter.post('/register', async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const name = String(req.body?.name || '').trim();
+  const password = String(req.body?.password || '');
+
+  if (!email || !email.includes('@')) return res.status(400).json({ error: 'INVALID_EMAIL' });
+  if (!name) return res.status(400).json({ error: 'NAME_REQUIRED' });
+  if (password.length < 6) return res.status(400).json({ error: 'WEAK_PASSWORD' });
+
+  const existing = await User.findOne({ email }).lean();
+  if (existing) return res.status(409).json({ error: 'EMAIL_EXISTS' });
+
+  const passwordHash = hashPassword(password);
+  const user = await User.create({ email, name, passwordHash });
+  const token = signJwt(user);
+
+  return res.status(201).json({
+    token,
+    user: {
+      id: String(user._id),
+      email: user.email,
+      name: user.name,
+    },
+  });
+});
+
+authRouter.post('/login', async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const password = String(req.body?.password || '');
+  if (!email || !email.includes('@')) return res.status(400).json({ error: 'INVALID_EMAIL' });
+  if (!password) return res.status(400).json({ error: 'PASSWORD_REQUIRED' });
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(401).json({ error: 'INVALID_CREDENTIALS' });
+  if (!user.passwordHash) return res.status(401).json({ error: 'PASSWORD_NOT_SET' });
+
+  const ok = verifyPassword(password, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: 'INVALID_CREDENTIALS' });
+
+  const token = signJwt(user);
+  return res.json({
+    token,
+    user: {
+      id: String(user._id),
+      email: user.email,
+      name: user.name,
+    },
+  });
+});
 
 authRouter.post('/request-otp', async (req, res) => {
   const email = normalizeEmail(req.body?.email);
