@@ -99,7 +99,7 @@ async function start() {
       const fromUserId = String(socket.user?.sub || '').trim();
       const to = String(toUserId || '').trim();
       const id = String(callId || '').trim();
-      const type = String(callType || 'voice').trim();
+      const type = 'video';
       if (!fromUserId || !to || !id) return;
       io.to(`user:${to}`).emit('call:incoming', { fromUserId, callId: id, callType: type });
     });
@@ -108,7 +108,7 @@ async function start() {
       const fromUserId = String(socket.user?.sub || '').trim();
       const to = String(toUserId || '').trim();
       const id = String(callId || '').trim();
-      const type = String(callType || 'voice').trim();
+      const type = 'video';
       if (!fromUserId || !to || !id) return;
       io.to(`user:${to}`).emit('call:accepted', { fromUserId, callId: id, callType: type });
     });
@@ -117,7 +117,7 @@ async function start() {
       const fromUserId = String(socket.user?.sub || '').trim();
       const to = String(toUserId || '').trim();
       const id = String(callId || '').trim();
-      const type = String(callType || 'voice').trim();
+      const type = 'video';
       if (!fromUserId || !to || !id) return;
       io.to(`user:${to}`).emit('call:declined', { fromUserId, callId: id, callType: type });
     });

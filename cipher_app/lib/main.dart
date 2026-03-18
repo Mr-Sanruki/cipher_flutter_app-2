@@ -56,8 +56,8 @@ class _CipherAppState extends ConsumerState<CipherApp> {
     final uAsync = ref.read(userByIdProvider(fromUserId));
     final u = uAsync.value;
 
-    final normalizedType = callType.trim().toLowerCase();
-    final isVideo = normalizedType == 'video';
+    final normalizedType = 'video';
+    final isVideo = true;
 
     await showModalBottomSheet<void>(
       context: navCtx,
@@ -100,9 +100,9 @@ class _CipherAppState extends ConsumerState<CipherApp> {
                           ref.read(incomingCallProvider.notifier).clear();
                           ref.read(chatRepositoryProvider).sendCallAccept(toUserId: fromUserId, callId: callId, callType: normalizedType);
                           Navigator.pop(ctx);
-                          navCtx.push(isVideo ? '/video-call/$callId' : '/call/$callId');
+                          navCtx.push('/video-call/$callId');
                         },
-                        icon: Icon(isVideo ? Icons.videocam : Icons.call),
+                        icon: const Icon(Icons.videocam),
                         label: const Text('Accept'),
                       ),
                     ),

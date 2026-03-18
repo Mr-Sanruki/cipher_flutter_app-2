@@ -5,7 +5,7 @@ class IncomingCallState {
   final String? fromUserId;
   final String? callId;
   final String callType;
-  const IncomingCallState({this.fromUserId, this.callId, this.callType = 'voice'});
+  const IncomingCallState({this.fromUserId, this.callId, this.callType = 'video'});
 
   bool get hasCall => fromUserId != null && callId != null;
 }
@@ -21,7 +21,7 @@ class IncomingCallNotifier extends StateNotifier<IncomingCallState> {
     _repo.incomingCalls().listen((m) {
       final from = m['fromUserId'];
       final call = m['callId'];
-      final type = (m['callType'] ?? 'voice').toString();
+      final type = 'video';
       if (from == null || call == null) return;
       state = IncomingCallState(fromUserId: from, callId: call, callType: type);
     });

@@ -121,7 +121,7 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
-        final callType = (payload['callType'] ?? 'voice').toString().trim();
+        final callType = 'video';
         if (fromUserId.isEmpty || callId.isEmpty) return;
         if (kDebugMode) {
           debugPrint('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
@@ -135,7 +135,7 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
-        final callType = (payload['callType'] ?? 'voice').toString().trim();
+        final callType = 'video';
         if (fromUserId.isEmpty || callId.isEmpty) return;
         _callEventController.add({'event': 'accepted', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
@@ -146,7 +146,7 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
-        final callType = (payload['callType'] ?? 'voice').toString().trim();
+        final callType = 'video';
         if (fromUserId.isEmpty || callId.isEmpty) return;
         _callEventController.add({'event': 'declined', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
@@ -192,16 +192,16 @@ class ChatRepository {
     return _callEventController.stream;
   }
 
-  void sendCallInvite({required String toUserId, required String callId, String callType = 'voice'}) {
-    _emitWhenConnected('call:invite', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
+  void sendCallInvite({required String toUserId, required String callId, String callType = 'video'}) {
+    _emitWhenConnected('call:invite', {'toUserId': toUserId, 'callId': callId, 'callType': 'video'});
   }
 
-  void sendCallAccept({required String toUserId, required String callId, String callType = 'voice'}) {
-    _emitWhenConnected('call:accept', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
+  void sendCallAccept({required String toUserId, required String callId, String callType = 'video'}) {
+    _emitWhenConnected('call:accept', {'toUserId': toUserId, 'callId': callId, 'callType': 'video'});
   }
 
-  void sendCallDecline({required String toUserId, required String callId, String callType = 'voice'}) {
-    _emitWhenConnected('call:decline', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
+  void sendCallDecline({required String toUserId, required String callId, String callType = 'video'}) {
+    _emitWhenConnected('call:decline', {'toUserId': toUserId, 'callId': callId, 'callType': 'video'});
   }
 
   // ─── Channels ───────────────────────────────────────────────
