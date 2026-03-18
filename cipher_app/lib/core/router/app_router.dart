@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/otp_screen.dart';
+import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/workspace/presentation/screens/workspace_screen.dart';
 import '../../features/workspace/presentation/screens/create_workspace_screen.dart';
@@ -38,6 +39,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (c, s) => const SplashScreen()),
       GoRoute(path: '/auth/login', builder: (c, s) => const LoginScreen()),
+      GoRoute(path: '/auth/register', builder: (c, s) => const RegisterScreen()),
       GoRoute(
         path: '/auth/otp',
         builder: (c, s) => OtpScreen(email: s.extra as String),
