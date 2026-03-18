@@ -67,11 +67,11 @@ class ChatRepository {
 
     if (_socket != null) {
       if (_socketToken != token) {
-        print('[socket] token changed -> recreating socket');
+        if (kDebugMode) debugPrint('[socket] token changed -> recreating socket');
         _disposeSocket();
       } else {
         if (!_socket!.connected) {
-          print('[socket] reconnecting existing socket');
+          if (kDebugMode) debugPrint('[socket] reconnecting existing socket');
           _socket!.connect();
         }
         return;
@@ -93,13 +93,13 @@ class ChatRepository {
     );
 
     s.on('connect', (_) {
-      print('[socket] connected id=${s.id}');
+      if (kDebugMode) debugPrint('[socket] connected id=${s.id}');
     });
     s.on('disconnect', (reason) {
-      print('[socket] disconnected reason=$reason');
+      if (kDebugMode) debugPrint('[socket] disconnected reason=$reason');
     });
     s.on('connect_error', (e) {
-      print('[socket] connect_error $e');
+      if (kDebugMode) debugPrint('[socket] connect_error $e');
     });
 
     s.on('chat:cleared', (payload) async {
@@ -128,7 +128,9 @@ class ChatRepository {
         final callId = (payload['callId'] ?? '').toString().trim();
         final callType = (payload['callType'] ?? 'voice').toString().trim();
         if (fromUserId.isEmpty || callId.isEmpty) return;
-        print('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
+        if (kDebugMode) {
+          debugPrint('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
+        }
         _incomingCallController.add({'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
     });
