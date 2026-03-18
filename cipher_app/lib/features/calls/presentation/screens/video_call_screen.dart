@@ -55,7 +55,7 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
       call: call,
       callConnectOptions: CallConnectOptions(
         speakerDefaultOn: true,
-        screenShare: TrackOption.enabled(),
+        screenShare: TrackOption.disabled(),
       ),
       callContentBuilder: (context, call, callState) {
         final local = callState.localParticipant;
