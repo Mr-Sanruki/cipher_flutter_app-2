@@ -24,9 +24,12 @@ import '../../features/calls/presentation/screens/voice_call_screen.dart';
 import '../../features/calls/presentation/screens/video_call_screen.dart';
 import '../../features/workspace/presentation/screens/members_screen.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final token = ref.watch(authTokenProvider);
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     redirect: (context, state) {
       final isLoggedIn = token != null;

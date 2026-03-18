@@ -27,13 +27,16 @@ class CipherApp extends ConsumerStatefulWidget {
 
 class _CipherAppState extends ConsumerState<CipherApp> {
   ProviderSubscription<IncomingCallState>? _incomingCallSub;
+  bool _incomingSheetOpen = false;
 
   @override
   void initState() {
     super.initState();
     _incomingCallSub = ref.listenManual(incomingCallProvider, (prev, next) {
       if (next.hasCall && (prev?.callId != next.callId)) {
-        _showIncomingCall(context, next.fromUserId!, next.callId!, next.callType);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showIncomingCall(next.fromUserId!, next.callId!, next.callType);
+        });
       }
     });
   }
@@ -44,7 +47,12 @@ class _CipherAppState extends ConsumerState<CipherApp> {
     super.dispose();
   }
 
-  Future<void> _showIncomingCall(BuildContext context, String fromUserId, String callId, String callType) async {
+  Future<void> _showIncomingCall(String fromUserId, String callId, String callType) async {
+    if (_incomingSheetOpen) return;
+    final navCtx = rootNavigatorKey.currentContext;
+    if (navCtx == null) return;
+    _incomingSheetOpen = true;
+
     final uAsync = ref.read(userByIdProvider(fromUserId));
     final u = uAsync.value;
 
@@ -52,7 +60,8 @@ class _CipherAppState extends ConsumerState<CipherApp> {
     final isVideo = normalizedType == 'video';
 
     await showModalBottomSheet<void>(
-      context: context,
+      context: navCtx,
+      useRootNavigator: true,
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) {
@@ -91,7 +100,7 @@ class _CipherAppState extends ConsumerState<CipherApp> {
                           ref.read(incomingCallProvider.notifier).clear();
                           ref.read(chatRepositoryProvider).sendCallAccept(toUserId: fromUserId, callId: callId, callType: normalizedType);
                           Navigator.pop(ctx);
-                          context.push(isVideo ? '/video-call/$callId' : '/call/$callId');
+                          navCtx.push(isVideo ? '/video-call/$callId' : '/call/$callId');
                         },
                         icon: Icon(isVideo ? Icons.videocam : Icons.call),
                         label: const Text('Accept'),
@@ -105,6 +114,8 @@ class _CipherAppState extends ConsumerState<CipherApp> {
         );
       },
     );
+
+    _incomingSheetOpen = false;
   }
 
   @override
