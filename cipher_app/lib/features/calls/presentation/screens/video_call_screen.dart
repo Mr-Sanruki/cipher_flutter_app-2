@@ -83,14 +83,16 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   onToggleMic: () async {
                     final next = !_micOn;
                     try {
-                      await call.setMicrophoneEnabled(enabled: next);
+                      final c = call as dynamic;
+                      await c.setMicrophoneEnabled(enabled: next);
                       if (mounted) setState(() => _micOn = next);
                     } catch (_) {}
                   },
                   onToggleCam: () async {
                     final next = !_camOn;
                     try {
-                      await call.setCameraEnabled(enabled: next);
+                      final c = call as dynamic;
+                      await c.setCameraEnabled(enabled: next);
                       if (mounted) setState(() => _camOn = next);
                     } catch (_) {}
                   },
@@ -102,7 +104,8 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   onToggleSpeaker: () async {
                     final next = !_speakerOn;
                     try {
-                      await call.setSpeakerphoneEnabled(enabled: next);
+                      final c = call as dynamic;
+                      await c.setSpeakerphoneEnabled(enabled: next);
                       if (mounted) setState(() => _speakerOn = next);
                     } catch (_) {}
                   },
