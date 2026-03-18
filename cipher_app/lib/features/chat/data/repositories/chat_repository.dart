@@ -121,7 +121,7 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
-        final callType = 'video';
+        const callType = 'video';
         if (fromUserId.isEmpty || callId.isEmpty) return;
         if (kDebugMode) {
           debugPrint('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
@@ -135,7 +135,7 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
-        final callType = 'video';
+        const callType = 'video';
         if (fromUserId.isEmpty || callId.isEmpty) return;
         _callEventController.add({'event': 'accepted', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
@@ -146,7 +146,7 @@ class ChatRepository {
         if (payload is! Map) return;
         final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
         final callId = (payload['callId'] ?? '').toString().trim();
-        final callType = 'video';
+        const callType = 'video';
         if (fromUserId.isEmpty || callId.isEmpty) return;
         _callEventController.add({'event': 'declined', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}

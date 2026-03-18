@@ -21,7 +21,7 @@ class IncomingCallNotifier extends StateNotifier<IncomingCallState> {
     _repo.incomingCalls().listen((m) {
       final from = m['fromUserId'];
       final call = m['callId'];
-      final type = 'video';
+      const type = 'video';
       if (from == null || call == null) return;
       state = IncomingCallState(fromUserId: from, callId: call, callType: type);
     });

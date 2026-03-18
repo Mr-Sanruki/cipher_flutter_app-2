@@ -56,8 +56,7 @@ class _CipherAppState extends ConsumerState<CipherApp> {
     final uAsync = ref.read(userByIdProvider(fromUserId));
     final u = uAsync.value;
 
-    final normalizedType = 'video';
-    final isVideo = true;
+    const normalizedType = 'video';
 
     await showModalBottomSheet<void>(
       context: navCtx,
@@ -77,7 +76,7 @@ class _CipherAppState extends ConsumerState<CipherApp> {
                     child: (u?.avatarUrl == null || (u!.avatarUrl ?? '').isEmpty) ? const Icon(Icons.person_outline) : null,
                   ),
                   title: Text(u?.name ?? fromUserId, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(isVideo ? 'Incoming video call' : 'Incoming call'),
+                  subtitle: const Text('Incoming video call'),
                 ),
                 const SizedBox(height: 12),
                 Row(
