@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
+import '../../../../core/ui/app_scaffold.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
   final String email;
@@ -51,53 +52,64 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(title: const Text('Verify Email')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            const Icon(Icons.mark_email_unread_outlined, size: 56, color: Color(0xFF6C63FF)),
-            const SizedBox(height: 24),
-            Text('Check your email',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    )),
-            const SizedBox(height: 8),
-            Text('We sent a 6-digit login code to ${widget.email}. Enter it below.',
-                style: TextStyle(color: Colors.grey[600])),
-            const SizedBox(height: 32),
-            TextField(
-              controller: _codeController,
-              decoration: const InputDecoration(
-                labelText: '6-digit code',
-                prefixIcon: Icon(Icons.lock_outline_rounded),
+      padding: const EdgeInsets.all(24),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 24),
+          const Icon(Icons.mark_email_unread_outlined, size: 56, color: Color(0xFF6C63FF)),
+          const SizedBox(height: 20),
+          Text(
+            'Check your email',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'We sent a 6-digit login code to ${widget.email}. Enter it below.',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 20),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _codeController,
+                    decoration: const InputDecoration(
+                      labelText: '6-digit code',
+                      prefixIcon: Icon(Icons.lock_outline_rounded),
+                    ),
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: (authState.isLoading || _submitting) ? null : _verify,
+                    child: authState.isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text('Verify & Login'),
+                  ),
+                ],
               ),
-              keyboardType: TextInputType.number,
-              maxLength: 6,
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: (authState.isLoading || _submitting) ? null : _verify,
-              child: authState.isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Text('Verify & Login'),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: _resend,
+              child: const Text('Resend code'),
             ),
-            const SizedBox(height: 16),
-            Center(
-              child: TextButton(
-                onPressed: _resend,
-                child: const Text('Resend link'),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
