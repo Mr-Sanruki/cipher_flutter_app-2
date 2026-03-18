@@ -88,6 +88,61 @@ class AuthRepository {
     }
   }
 
+  Future<Map<String, dynamic>> registerWithPassword({
+    required String email,
+    required String name,
+    required String password,
+  }) async {
+    late final Response res;
+    try {
+      res = await _dio.post('/auth/register', data: {'email': email, 'name': name, 'password': password});
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+
+    final data = res.data;
+    if (data is! Map) throw Exception('Invalid response');
+    final token = data['token'];
+    if (token is! String || token.isEmpty) throw Exception('Missing token');
+    await saveToken(token);
+
+    final user = data['user'];
+    if (user is Map && user['id'] != null) {
+      await saveBackendUserId(user['id'].toString());
+    }
+
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<Map<String, dynamic>> loginWithPassword({
+    required String email,
+    required String password,
+  }) async {
+    late final Response res;
+    try {
+      res = await _dio.post('/auth/login', data: {'email': email, 'password': password});
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+
+    final data = res.data;
+    if (data is! Map) throw Exception('Invalid response');
+    final token = data['token'];
+    if (token is! String || token.isEmpty) throw Exception('Missing token');
+    await saveToken(token);
+
+    final user = data['user'];
+    if (user is Map && user['id'] != null) {
+      await saveBackendUserId(user['id'].toString());
+    }
+
+    return Map<String, dynamic>.from(data);
+  }
+
   Future<Map<String, dynamic>> verifyOtp({required String email, required String code}) async {
     late final Response res;
     try {

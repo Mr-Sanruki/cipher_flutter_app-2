@@ -73,6 +73,26 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
+  Future<void> registerWithPassword({required String email, required String name, required String password}) async {
+    if (state.isLoading) return;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _repo.registerWithPassword(email: email, name: name, password: password);
+      await _ref.read(authTokenProvider.notifier).refresh();
+      await _ref.read(backendUserIdProvider.notifier).refresh();
+    });
+  }
+
+  Future<void> loginWithPassword({required String email, required String password}) async {
+    if (state.isLoading) return;
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _repo.loginWithPassword(email: email, password: password);
+      await _ref.read(authTokenProvider.notifier).refresh();
+      await _ref.read(backendUserIdProvider.notifier).refresh();
+    });
+  }
+
   Future<void> signOut() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

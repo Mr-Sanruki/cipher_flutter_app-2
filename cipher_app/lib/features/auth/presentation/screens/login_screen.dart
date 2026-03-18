@@ -13,11 +13,14 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _usePassword = false;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -29,6 +32,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (state is! AsyncError) {
       context.push('/auth/otp', extra: _emailController.text.trim());
     } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${state.error}')),
+      );
+    }
+  }
+
+  Future<void> _loginWithPassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    await ref.read(authNotifierProvider.notifier).loginWithPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+    if (!mounted) return;
+    final state = ref.read(authNotifierProvider);
+    if (state is AsyncError) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${state.error}')),
       );
@@ -73,9 +91,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
+                if (_usePassword) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                    validator: (v) {
+                      if (!_usePassword) return null;
+                      if (v == null || v.isEmpty) return 'Please enter your password';
+                      if (v.length < 6) return 'Password must be at least 6 characters';
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: authState.isLoading ? null : _sendOtp,
+                  onPressed: authState.isLoading ? null : (_usePassword ? _loginWithPassword : _sendOtp),
                   child: authState.isLoading
                       ? const SizedBox(
                           height: 20,
@@ -85,12 +120,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text('Send Code'),
+                      : Text(_usePassword ? 'Login' : 'Send Code'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => setState(() {
+                            _usePassword = !_usePassword;
+                          }),
+                  child: Text(_usePassword ? 'Use OTP instead' : 'Use password instead'),
+                ),
+                TextButton(
+                  onPressed: authState.isLoading ? null : () => context.push('/auth/register'),
+                  child: const Text('Create account'),
                 ),
                 const Spacer(),
                 Center(
                   child: Text(
-                    'We\'ll send a 6-digit login code to your email',
+                    _usePassword ? 'Login with your email and password' : 'We\'ll send a 6-digit login code to your email',
                     style: TextStyle(color: Colors.grey[500], fontSize: 13),
                   ),
                 ),
