@@ -24,7 +24,8 @@ function publicUrl(req, filePathAbs) {
     .relative(UPLOAD_ROOT, filePathAbs)
     .split(path.sep)
     .join('/');
-  const base = `${req.protocol}://${req.get('host')}`;
+  const configured = String(process.env.PUBLIC_BASE_URL || '').trim().replace(/\/$/, '');
+  const base = configured || `${req.protocol}://${req.get('host')}`;
   return `${base}/static/${rel}`;
 }
 
