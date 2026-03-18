@@ -129,6 +129,26 @@ class ChatRepository {
     _socket = s;
   }
 
+  void _emitWhenConnected(String event, Map<String, dynamic> data) {
+    _ensureSocketConnected();
+    final s = _socket;
+    if (s == null) return;
+
+    if (s.connected) {
+      s.emit(event, data);
+      return;
+    }
+
+    void onConnect(_) {
+      try {
+        s.emit(event, data);
+      } catch (_) {}
+      s.off('connect', onConnect);
+    }
+
+    s.on('connect', onConnect);
+  }
+
   Stream<Map<String, String>> incomingCalls() {
     _socketRetryTimer ??= Timer.periodic(const Duration(seconds: 2), (t) {
       try {
@@ -150,18 +170,15 @@ class ChatRepository {
   }
 
   void sendCallInvite({required String toUserId, required String callId, String callType = 'voice'}) {
-    _ensureSocketConnected();
-    _socket?.emit('call:invite', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
+    _emitWhenConnected('call:invite', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
   }
 
   void sendCallAccept({required String toUserId, required String callId, String callType = 'voice'}) {
-    _ensureSocketConnected();
-    _socket?.emit('call:accept', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
+    _emitWhenConnected('call:accept', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
   }
 
   void sendCallDecline({required String toUserId, required String callId, String callType = 'voice'}) {
-    _ensureSocketConnected();
-    _socket?.emit('call:decline', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
+    _emitWhenConnected('call:decline', {'toUserId': toUserId, 'callId': callId, 'callType': callType});
   }
 
   // ─── Channels ───────────────────────────────────────────────
