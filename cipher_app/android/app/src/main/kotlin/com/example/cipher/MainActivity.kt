@@ -14,6 +14,8 @@ class MainActivity : FlutterActivity() {
 
   private var previousMode: Int? = null
   private var previousSpeakerOn: Boolean? = null
+  private var previousMicMute: Boolean? = null
+  private var previousBluetoothScoOn: Boolean? = null
   private var focusRequest: AudioFocusRequest? = null
 
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -52,8 +54,17 @@ class MainActivity : FlutterActivity() {
 
     if (previousMode == null) previousMode = am.mode
     if (previousSpeakerOn == null) previousSpeakerOn = am.isSpeakerphoneOn
+    if (previousMicMute == null) previousMicMute = am.isMicrophoneMute
+    if (previousBluetoothScoOn == null) previousBluetoothScoOn = am.isBluetoothScoOn
 
     requestFocus(am)
+    try {
+      am.isMicrophoneMute = false
+    } catch (_: Exception) {}
+    try {
+      am.stopBluetoothSco()
+      am.isBluetoothScoOn = false
+    } catch (_: Exception) {}
     am.mode = AudioManager.MODE_IN_COMMUNICATION
     am.isSpeakerphoneOn = true
   }
@@ -102,10 +113,32 @@ class MainActivity : FlutterActivity() {
     val spk = previousSpeakerOn
     if (spk != null) am.isSpeakerphoneOn = spk
 
+    val micMute = previousMicMute
+    if (micMute != null) {
+      try {
+        am.isMicrophoneMute = micMute
+      } catch (_: Exception) {}
+    }
+
+    val scoOn = previousBluetoothScoOn
+    if (scoOn != null) {
+      try {
+        if (scoOn) {
+          am.startBluetoothSco()
+          am.isBluetoothScoOn = true
+        } else {
+          am.stopBluetoothSco()
+          am.isBluetoothScoOn = false
+        }
+      } catch (_: Exception) {}
+    }
+
     val mode = previousMode
     if (mode != null) am.mode = mode
 
     previousMode = null
     previousSpeakerOn = null
+    previousMicMute = null
+    previousBluetoothScoOn = null
   }
 }

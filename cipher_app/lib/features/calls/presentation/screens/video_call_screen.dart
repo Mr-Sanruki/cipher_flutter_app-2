@@ -128,6 +128,11 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                       } catch (_) {
                         await c.setSpeakerEnabled(enabled: next);
                       }
+                      if (next) {
+                        try {
+                          await _audioChannel.invokeMethod('configureForCall');
+                        } catch (_) {}
+                      }
                       if (mounted) setState(() => _speakerOn = next);
                     } catch (_) {}
                   },
