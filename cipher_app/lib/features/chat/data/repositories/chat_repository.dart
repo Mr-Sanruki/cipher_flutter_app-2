@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as sio;
 import '../models/message_model.dart';
@@ -50,14 +51,26 @@ class ChatRepository {
     final s = sio.io(
       _baseUrl,
       sio.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
+          .enableReconnection()
+          .setReconnectionAttempts(999)
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(5000)
+          .setTimeout(20000)
           .disableAutoConnect()
           .setAuth({'token': token})
           .build(),
     );
 
-    s.on('connect', (_) {});
-    s.on('connect_error', (_) {});
+    s.on('connect', (_) {
+      debugPrint('[socket] connected id=${s.id}');
+    });
+    s.on('disconnect', (reason) {
+      debugPrint('[socket] disconnected reason=$reason');
+    });
+    s.on('connect_error', (e) {
+      debugPrint('[socket] connect_error $e');
+    });
 
     s.on('chat:cleared', (payload) async {
       try {
@@ -85,6 +98,7 @@ class ChatRepository {
         final callId = (payload['callId'] ?? '').toString().trim();
         final callType = (payload['callType'] ?? 'voice').toString().trim();
         if (fromUserId.isEmpty || callId.isEmpty) return;
+        debugPrint('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
         _incomingCallController.add({'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
     });
