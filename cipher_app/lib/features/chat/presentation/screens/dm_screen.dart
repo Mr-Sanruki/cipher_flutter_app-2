@@ -58,6 +58,7 @@ class _DmScreenState extends ConsumerState<DmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final messagesAsync = ref.watch(messagesProvider((chatType: 'dm', chatId: widget.dmId)));
     final dmsAsync = ref.watch(dmsProvider);
     final myId = ref.watch(backendUserIdProvider);
@@ -88,13 +89,13 @@ class _DmScreenState extends ConsumerState<DmScreen> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: Colors.blue.shade100,
+              backgroundColor: cs.surfaceContainerHighest,
               radius: 16,
               backgroundImage: otherUser?.avatarUrl != null && (otherUser!.avatarUrl ?? '').isNotEmpty
                   ? NetworkImage(otherUser.avatarUrl!)
                   : null,
               child: (otherUser?.avatarUrl == null || (otherUser!.avatarUrl ?? '').isEmpty)
-                  ? Icon(Icons.person_outline, color: Colors.blue.shade700, size: 18)
+                  ? Icon(Icons.person_outline, color: cs.onSurface.withValues(alpha: 0.8), size: 18)
                   : null,
             ),
             const SizedBox(width: 8),
@@ -162,7 +163,12 @@ class _DmScreenState extends ConsumerState<DmScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (messages) => messages.isEmpty
-                  ? const Center(child: Text('Start a conversation!'))
+                  ? Center(
+                      child: Text(
+                        'Start a conversation!',
+                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                      ),
+                    )
                   : ListView.builder(
                       reverse: true,
                       itemCount: messages.length,

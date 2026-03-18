@@ -29,6 +29,7 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final q = _ctrl.text;
     final resultsAsync = ref.watch(messageSearchProvider((
       chatType: widget.chatType,
@@ -41,20 +42,40 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
         title: TextField(
           controller: _ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Search messages...',
-            border: InputBorder.none,
+            prefixIcon: Icon(Icons.search, color: cs.onSurface.withValues(alpha: 0.65)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: cs.surfaceContainerHighest,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            isDense: true,
           ),
           onChanged: (_) => setState(() {}),
         ),
       ),
       body: q.trim().isEmpty
-          ? const Center(child: Text('Type to search'))
+          ? Center(
+              child: Text(
+                'Type to search',
+                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+              ),
+            )
           : resultsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (items) {
-                if (items.isEmpty) return const Center(child: Text('No results'));
+                if (items.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No results',
+                      style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                    ),
+                  );
+                }
                 return ListView.builder(
                   reverse: false,
                   itemCount: items.length,

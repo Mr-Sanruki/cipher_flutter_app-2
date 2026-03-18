@@ -28,14 +28,26 @@ class MessageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final myId = ref.watch(backendUserIdProvider);
     final isMe = myId != null && message.senderId == myId;
+    final cs = Theme.of(context).colorScheme;
 
     if (message.isDeleted) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Text('🚫 This message was deleted',
-            style: TextStyle(color: Colors.grey[400], fontStyle: FontStyle.italic, fontSize: 13)),
+        child: Text(
+          '🚫 This message was deleted',
+          style: TextStyle(
+            color: cs.onSurface.withValues(alpha: 0.55),
+            fontStyle: FontStyle.italic,
+            fontSize: 13,
+          ),
+        ),
       );
     }
+
+    final bubbleColor = isMe ? cs.primary : cs.surfaceContainerHighest;
+    final bubbleBorder = !isMe ? Border.all(color: cs.outline.withValues(alpha: 0.45)) : null;
+    final textColor = isMe ? cs.onPrimary : cs.onSurface;
+    final metaColor = cs.onSurface.withValues(alpha: 0.55);
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(context, ref, isMe),
@@ -47,13 +59,13 @@ class MessageBubble extends ConsumerWidget {
             if (!isMe) ...[
               CircleAvatar(
                 radius: 16,
-                backgroundColor: const Color(0xFF6C63FF),
+                backgroundColor: cs.surfaceContainerHighest,
                 backgroundImage: message.senderAvatar != null
                     ? CachedNetworkImageProvider(message.senderAvatar!)
                     : null,
                 child: message.senderAvatar == null
                     ? Text(message.senderName[0].toUpperCase(),
-                        style: const TextStyle(color: Colors.white, fontSize: 12))
+                        style: TextStyle(color: cs.onSurface, fontSize: 12, fontWeight: FontWeight.w700))
                     : null,
               ),
               const SizedBox(width: 8),
@@ -66,12 +78,13 @@ class MessageBubble extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(message.senderName,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: cs.onSurface)),
                     ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFF6C63FF) : Colors.grey[100],
+                      color: bubbleColor,
+                      border: bubbleBorder,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -88,7 +101,9 @@ class MessageBubble extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
-                              color: isMe ? Colors.white.withAlpha(38) : Colors.black.withAlpha(13),
+                              color: isMe
+                                  ? cs.onPrimary.withValues(alpha: 0.14)
+                                  : cs.onSurface.withValues(alpha: 0.10),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Column(
@@ -97,7 +112,7 @@ class MessageBubble extends ConsumerWidget {
                                 Text(
                                   'Forwarded',
                                   style: TextStyle(
-                                    color: isMe ? Colors.white70 : Colors.black54,
+                                    color: isMe ? cs.onPrimary.withValues(alpha: 0.75) : metaColor,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -108,7 +123,7 @@ class MessageBubble extends ConsumerWidget {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: isMe ? Colors.white : Colors.black87,
+                                    color: textColor,
                                     fontSize: 13,
                                   ),
                                 ),
@@ -116,7 +131,7 @@ class MessageBubble extends ConsumerWidget {
                             ),
                           ),
                         ],
-                        _buildContent(context, isMe),
+                        _buildContent(context, isMe, textColor),
                       ],
                     ),
                   ),
@@ -141,7 +156,7 @@ class MessageBubble extends ConsumerWidget {
                     children: [
                       Text(
                         timeago.format(message.createdAt),
-                        style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                        style: TextStyle(color: metaColor, fontSize: 11),
                       ),
                       if (isMe) ...[
                         const SizedBox(width: 6),
@@ -154,7 +169,7 @@ class MessageBubble extends ConsumerWidget {
                       if (message.isEdited) ...[
                         const SizedBox(width: 4),
                         Text('(edited)',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 11, fontStyle: FontStyle.italic)),
+                            style: TextStyle(color: metaColor, fontSize: 11, fontStyle: FontStyle.italic)),
                       ],
                     ],
                   ),
@@ -166,8 +181,11 @@ class MessageBubble extends ConsumerWidget {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           '💬 ${message.threadCount} ${message.threadCount == 1 ? 'reply' : 'replies'}',
-                          style: const TextStyle(
-                              color: Color(0xFF6C63FF), fontSize: 12, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: cs.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -181,8 +199,8 @@ class MessageBubble extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, bool isMe) {
-    final textColor = isMe ? Colors.white : Colors.black87;
+  Widget _buildContent(BuildContext context, bool isMe, Color textColor) {
+    final cs = Theme.of(context).colorScheme;
     switch (message.type) {
       case MessageType.image:
         return InkWell(
@@ -218,7 +236,7 @@ class MessageBubble extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_fileIcon(message.type), color: isMe ? Colors.white70 : Colors.grey[600], size: 20),
+              Icon(_fileIcon(message.type), color: isMe ? cs.onPrimary.withValues(alpha: 0.8) : cs.onSurface.withValues(alpha: 0.7), size: 20),
               const SizedBox(width: 8),
               Flexible(
                 child: Column(
@@ -229,7 +247,7 @@ class MessageBubble extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis),
                     if (message.fileSize != null)
                       Text(message.fileSize!,
-                          style: TextStyle(color: isMe ? Colors.white60 : Colors.grey[500], fontSize: 11)),
+                          style: TextStyle(color: isMe ? cs.onPrimary.withValues(alpha: 0.7) : cs.onSurface.withValues(alpha: 0.55), fontSize: 11)),
                   ],
                 ),
               ),

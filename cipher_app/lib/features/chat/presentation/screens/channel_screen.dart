@@ -56,6 +56,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final messagesAsync = ref.watch(messagesProvider((chatType: 'channel', chatId: widget.channelId)));
     final workspace = ref.watch(selectedWorkspaceProvider);
     final myId = ref.watch(backendUserIdProvider);
@@ -74,8 +75,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             Text('# ${channel?.name ?? 'Channel'}',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             if (channel?.isAnnouncement == true)
-              const Text('Announcement channel',
-                  style: TextStyle(fontSize: 11, color: Colors.orange)),
+              Text(
+                'Announcement channel',
+                style: TextStyle(fontSize: 11, color: cs.primary.withValues(alpha: 0.9)),
+              ),
           ],
         ),
         actions: [
@@ -104,7 +107,13 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (messages) => messages.isEmpty
-                  ? const Center(child: Text('No messages yet. Be the first to post!'))
+                  ? Center(
+                      child: Text(
+                        'No messages yet. Be the first to post!',
+                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
                   : ListView.builder(
                       reverse: true,
                       itemCount: messages.length,

@@ -12,6 +12,7 @@ class ThreadScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     final extra = GoRouterState.of(context).extra;
     final args = extra is Map ? extra : null;
     final chatId = args?['chatId'] as String? ?? '';
@@ -35,17 +36,22 @@ class ThreadScreen extends ConsumerWidget {
         children: [
           if (parentMessage != null) ...[
             Container(
-              color: Colors.grey[50],
+              color: cs.surface,
               child: MessageBubble(message: parentMessage, chatType: chatType, chatId: chatId, showSender: true),
             ),
-            Divider(height: 1, color: Colors.grey[200]),
+            Divider(height: 1, color: cs.outline.withValues(alpha: 0.6)),
           ],
           Expanded(
             child: threadsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (replies) => replies.isEmpty
-                  ? const Center(child: Text('No replies yet'))
+                  ? Center(
+                      child: Text(
+                        'No replies yet',
+                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: replies.length,
                       itemBuilder: (_, i) => MessageBubble(

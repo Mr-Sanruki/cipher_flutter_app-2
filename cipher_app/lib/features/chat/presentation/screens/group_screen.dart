@@ -59,6 +59,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final messagesAsync = ref.watch(messagesProvider((chatType: 'group', chatId: widget.groupId)));
     final groupsAsync = ref.watch(groupsProvider);
     final group = groupsAsync.value?.firstWhere(
@@ -71,11 +72,11 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: Colors.green.shade100,
+              backgroundColor: cs.surfaceContainerHighest,
               radius: 16,
               child: Text(
                 group?.name[0].toUpperCase() ?? 'G',
-                style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 14),
+                style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w800, fontSize: 14),
               ),
             ),
             const SizedBox(width: 8),
@@ -86,7 +87,7 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 if (group != null)
                   Text('${group.memberIds.length} members',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.65))),
               ],
             ),
           ],
@@ -134,7 +135,12 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (messages) => messages.isEmpty
-                  ? const Center(child: Text('Start the conversation!'))
+                  ? Center(
+                      child: Text(
+                        'Start the conversation!',
+                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                      ),
+                    )
                   : ListView.builder(
                       reverse: true,
                       itemCount: messages.length,

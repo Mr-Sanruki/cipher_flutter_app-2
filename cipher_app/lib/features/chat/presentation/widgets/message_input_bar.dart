@@ -66,12 +66,12 @@ class _MessageInputBarState extends State<MessageInputBar> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.image_outlined, color: Color(0xFF6C63FF)),
+              leading: Icon(Icons.image_outlined, color: Theme.of(context).colorScheme.primary),
               title: const Text('Photo from gallery'),
               onTap: () { Navigator.pop(context); _pickImage(); },
             ),
             ListTile(
-              leading: const Icon(Icons.attach_file_outlined, color: Color(0xFF6C63FF)),
+              leading: Icon(Icons.attach_file_outlined, color: Theme.of(context).colorScheme.primary),
               title: const Text('Any file'),
               onTap: () { Navigator.pop(context); _pickFile(); },
             ),
@@ -84,13 +84,14 @@ class _MessageInputBarState extends State<MessageInputBar> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final borderColor = cs.outline.withValues(alpha: 0.6);
 
     if (widget.readOnly) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: cs.surface,
-          border: Border(top: BorderSide(color: cs.outlineVariant.withAlpha(100))),
+          border: Border(top: BorderSide(color: borderColor)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -108,7 +109,7 @@ class _MessageInputBarState extends State<MessageInputBar> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border(top: BorderSide(color: cs.outlineVariant.withAlpha(100))),
+        border: Border(top: BorderSide(color: borderColor)),
       ),
       child: SafeArea(
         child: Row(
