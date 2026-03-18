@@ -267,6 +267,8 @@ class _ChannelsTab extends ConsumerWidget {
     final myId = ref.watch(backendUserIdProvider);
     final isAdmin = workspace?.isAdmin(myId ?? '') ?? false;
 
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: channelsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -274,25 +276,38 @@ class _ChannelsTab extends ConsumerWidget {
         data: (channels) => channels.isEmpty
             ? _emptyState(context, 'No channels yet', Icons.tag)
             : ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 itemCount: channels.length,
                 itemBuilder: (context, i) {
                   final ch = channels[i];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: ch.isAnnouncement
-                          ? Colors.orange.shade100
-                          : Colors.purple.shade100,
-                      child: Icon(
-                        ch.isAnnouncement ? Icons.campaign_outlined : Icons.tag,
-                        color: ch.isAnnouncement ? Colors.orange : Colors.purple,
-                        size: 20,
+                  final icon = ch.isAnnouncement ? Icons.campaign_outlined : Icons.tag;
+                  final subtitle = ch.isAnnouncement ? 'Announcement' : 'Channel';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      color: cs.surface,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        leading: CircleAvatar(
+                          backgroundColor: cs.surfaceContainerHighest,
+                          child: Icon(icon, color: cs.primary, size: 20),
+                        ),
+                        title: Text(
+                          ch.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.65), fontSize: 12),
+                        ),
+                        trailing: Icon(Icons.chevron_right, color: cs.onSurface.withValues(alpha: 0.4)),
+                        onTap: () => context.push('/channel/${ch.id}'),
                       ),
                     ),
-                    title: Text(ch.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                    subtitle: Text(ch.isAnnouncement ? 'Announcement' : 'Channel',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                    onTap: () => context.push('/channel/${ch.id}'),
                   );
                 },
               ),
@@ -409,6 +424,9 @@ class _DmsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dmsAsync = ref.watch(dmsProvider);
+
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: dmsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -416,26 +434,52 @@ class _DmsTab extends ConsumerWidget {
         data: (dms) => dms.isEmpty
             ? _emptyState(context, 'No direct messages', Icons.chat_bubble_outline)
             : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 itemCount: dms.length,
                 itemBuilder: (context, i) {
                   final dm = dms[i];
                   final myId = ref.read(backendUserIdProvider);
                   final otherId = myId != null ? dm.otherUserId(myId) : '';
                   final otherUserAsync = otherId.isNotEmpty ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blue.shade100,
-                      child: Icon(Icons.person_outline, color: Colors.blue.shade700),
+                  final name = otherUserAsync.value?.name ?? 'User';
+                  final last = dm.lastMessage;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      color: cs.surface,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        leading: CircleAvatar(
+                          backgroundColor: cs.surfaceContainerHighest,
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                            style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: last != null && last.isNotEmpty
+                            ? Text(
+                                last,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.65), fontSize: 12),
+                              )
+                            : Text(
+                                'Tap to chat',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.55), fontSize: 12),
+                              ),
+                        trailing: Icon(Icons.chevron_right, color: cs.onSurface.withValues(alpha: 0.4)),
+                        onTap: () => context.push('/dm/${dm.id}'),
+                      ),
                     ),
-                    title: Text(
-                      otherUserAsync.value?.name ?? 'User',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: dm.lastMessage != null
-                        ? Text(dm.lastMessage!, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: Colors.grey[500], fontSize: 12))
-                        : null,
-                    onTap: () => context.push('/dm/${dm.id}'),
                   );
                 },
               ),
@@ -456,6 +500,9 @@ class _GroupsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(groupsProvider);
+
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: groupsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -463,19 +510,39 @@ class _GroupsTab extends ConsumerWidget {
         data: (groups) => groups.isEmpty
             ? _emptyState(context, 'No groups yet', Icons.group_outlined)
             : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 itemCount: groups.length,
                 itemBuilder: (context, i) {
                   final g = groups[i];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.green.shade100,
-                      child: Text(g.name[0].toUpperCase(),
-                          style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      color: cs.surface,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        leading: CircleAvatar(
+                          backgroundColor: cs.surfaceContainerHighest,
+                          child: Text(
+                            g.name.isNotEmpty ? g.name[0].toUpperCase() : 'G',
+                            style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        title: Text(
+                          g.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          '${g.memberIds.length} members',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.65), fontSize: 12),
+                        ),
+                        trailing: Icon(Icons.chevron_right, color: cs.onSurface.withValues(alpha: 0.4)),
+                        onTap: () => context.push('/group/${g.id}'),
+                      ),
                     ),
-                    title: Text(g.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                    subtitle: Text('${g.memberIds.length} members',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                    onTap: () => context.push('/group/${g.id}'),
                   );
                 },
               ),
@@ -527,9 +594,17 @@ Widget _emptyState(BuildContext context, String message, IconData icon) => Cente
   child: Column(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      Icon(icon, size: 64, color: Colors.grey[300]),
+      Icon(icon, size: 56, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25)),
       const SizedBox(height: 16),
-      Text(message, style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+      Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     ],
   ),
 );
