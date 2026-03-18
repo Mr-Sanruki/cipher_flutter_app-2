@@ -22,6 +22,7 @@ class ChatRepository {
   final String _baseUrl;
 
   sio.Socket? _socket;
+  String? _socketToken;
   Timer? _socketRetryTimer;
   final _incomingCallController = StreamController<Map<String, String>>.broadcast();
   final _callEventController = StreamController<Map<String, String>>.broadcast();
@@ -43,10 +44,39 @@ class ChatRepository {
     return {'Authorization': 'Bearer $token'};
   }
 
+  void _disposeSocket() {
+    try {
+      _socketRetryTimer?.cancel();
+      _socketRetryTimer = null;
+    } catch (_) {}
+
+    try {
+      _socket?.dispose();
+    } catch (_) {
+      try {
+        _socket?.disconnect();
+      } catch (_) {}
+    }
+    _socket = null;
+    _socketToken = null;
+  }
+
   void _ensureSocketConnected() {
-    if (_socket != null && _socket!.connected) return;
     final token = _authRepo.getSavedToken();
     if (token == null) return;
+
+    if (_socket != null) {
+      if (_socketToken != token) {
+        print('[socket] token changed -> recreating socket');
+        _disposeSocket();
+      } else {
+        if (!_socket!.connected) {
+          print('[socket] reconnecting existing socket');
+          _socket!.connect();
+        }
+        return;
+      }
+    }
 
     final s = sio.io(
       _baseUrl,
@@ -63,13 +93,13 @@ class ChatRepository {
     );
 
     s.on('connect', (_) {
-      debugPrint('[socket] connected id=${s.id}');
+      print('[socket] connected id=${s.id}');
     });
     s.on('disconnect', (reason) {
-      debugPrint('[socket] disconnected reason=$reason');
+      print('[socket] disconnected reason=$reason');
     });
     s.on('connect_error', (e) {
-      debugPrint('[socket] connect_error $e');
+      print('[socket] connect_error $e');
     });
 
     s.on('chat:cleared', (payload) async {
@@ -98,7 +128,7 @@ class ChatRepository {
         final callId = (payload['callId'] ?? '').toString().trim();
         final callType = (payload['callType'] ?? 'voice').toString().trim();
         if (fromUserId.isEmpty || callId.isEmpty) return;
-        debugPrint('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
+        print('[socket] call:incoming from=$fromUserId callId=$callId type=$callType');
         _incomingCallController.add({'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
       } catch (_) {}
     });
@@ -127,6 +157,7 @@ class ChatRepository {
 
     s.connect();
     _socket = s;
+    _socketToken = token;
   }
 
   void _emitWhenConnected(String event, Map<String, dynamic> data) {
