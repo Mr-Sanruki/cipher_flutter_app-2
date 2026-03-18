@@ -28,6 +28,15 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
         id: widget.callId,
       );
       await call.getOrCreate();
+      try {
+        final c = call as dynamic;
+        await c.join(
+          connectOptions: CallConnectOptions(
+            speakerDefaultOn: true,
+            camera: TrackOption.disabled(),
+          ),
+        );
+      } catch (_) {}
       setState(() => _call = call);
     } catch (_) {
       if (mounted) setState(() => _call = null);
