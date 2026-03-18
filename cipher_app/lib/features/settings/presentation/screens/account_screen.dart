@@ -9,41 +9,77 @@ class AccountScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Account')),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         children: [
-          const Icon(Icons.manage_accounts_outlined, size: 64, color: Color(0xFF6C63FF)),
-          const SizedBox(height: 24),
-          const Text('Account Management',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text('Manage your account settings',
-              style: TextStyle(color: Colors.grey[500]),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 48),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cs.outline.withValues(alpha: 0.35)),
+                    ),
+                    child: Icon(Icons.manage_accounts_outlined, color: cs.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Account Management', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Notifications, logout, and account deletion',
+                          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Notifications toggle
-          ref.watch(currentUserProvider).when(
-            data: (user) => SwitchListTile(
-              title: const Text('Push Notifications'),
-              subtitle: const Text('Receive message notifications'),
-              value: user?.notificationsEnabled ?? true,
-              onChanged: (v) async {
-                if (user == null) return;
-                await ref.read(authRepositoryProvider).updateUser(
-                  user.copyWith(notificationsEnabled: v),
-                );
-                ref.invalidate(currentUserProvider);
-              },
+          Card(
+            child: ref.watch(currentUserProvider).when(
+              data: (user) => SwitchListTile(
+                title: const Text('Push Notifications', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  'Receive message notifications',
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.65), fontSize: 12),
+                ),
+                value: user?.notificationsEnabled ?? true,
+                onChanged: (v) async {
+                  if (user == null) return;
+                  await ref.read(authRepositoryProvider).updateUser(
+                    user.copyWith(notificationsEnabled: v),
+                  );
+                  ref.invalidate(currentUserProvider);
+                },
+              ),
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(height: 24, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Error: $e'),
+              ),
             ),
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
           ),
 
-          const Divider(height: 32),
+          const SizedBox(height: 12),
 
           // Logout
           OutlinedButton.icon(
@@ -72,7 +108,7 @@ class AccountScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             'Deleting your account is permanent and cannot be undone.',
-            style: TextStyle(color: Colors.grey[400], fontSize: 12),
+            style: TextStyle(color: cs.onSurface.withValues(alpha: 0.55), fontSize: 12),
             textAlign: TextAlign.center,
           ),
         ],

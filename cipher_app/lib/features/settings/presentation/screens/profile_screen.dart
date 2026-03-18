@@ -74,6 +74,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
@@ -98,66 +99,112 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           }
 
           return ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Center(
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xFF6C63FF),
-                    backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                        ? NetworkImage(user.avatarUrl!)
-                        : null,
-                    child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
-                        ? Text(
-                            (user?.name ?? '').isNotEmpty
-                                ? (user!.name[0].toUpperCase())
-                                : 'U',
-                            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
-                          )
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _pickAvatar,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF6C63FF),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 34,
+                            backgroundColor: cs.surfaceContainerHighest,
+                            backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                                ? NetworkImage(user.avatarUrl!)
+                                : null,
+                            child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                                ? Text(
+                                    (user?.name ?? '').isNotEmpty
+                                        ? (user!.name[0].toUpperCase())
+                                        : 'U',
+                                    style: TextStyle(
+                                      color: cs.onSurface,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: _loading ? null : _pickAvatar,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: cs.primary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: cs.surface, width: 2),
+                                ),
+                                child: Icon(Icons.camera_alt, color: cs.onPrimary, size: 14),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user?.name ?? 'User',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user?.email ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7), fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Display name',
-                prefixIcon: Icon(Icons.person_outline),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Display name',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _bioCtrl,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Bio (optional)',
+                          prefixIcon: Icon(Icons.info_outline),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _bioCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Bio (optional)',
-                prefixIcon: Icon(Icons.info_outline),
-                alignLabelWithHint: true,
+              const SizedBox(height: 10),
+              Text(
+                'Changes are saved to your account and will sync across devices.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.55), fontSize: 12),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text('Email: ${user?.email ?? ''}',
-                style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-          ],
+            ],
           );
         },
       ),
