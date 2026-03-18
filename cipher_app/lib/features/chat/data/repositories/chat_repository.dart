@@ -46,11 +46,6 @@ class ChatRepository {
 
   void _disposeSocket() {
     try {
-      _socketRetryTimer?.cancel();
-      _socketRetryTimer = null;
-    } catch (_) {}
-
-    try {
       _socket?.dispose();
     } catch (_) {
       try {
@@ -185,11 +180,6 @@ class ChatRepository {
   Stream<Map<String, String>> incomingCalls() {
     _socketRetryTimer ??= Timer.periodic(const Duration(seconds: 2), (t) {
       try {
-        if (_socket != null && _socket!.connected) {
-          t.cancel();
-          _socketRetryTimer = null;
-          return;
-        }
         _ensureSocketConnected();
       } catch (_) {}
     });
