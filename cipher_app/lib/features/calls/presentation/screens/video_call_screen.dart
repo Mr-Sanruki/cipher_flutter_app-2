@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import '../providers/call_provider.dart';
@@ -12,6 +13,7 @@ class VideoCallScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
+  static const MethodChannel _audioChannel = MethodChannel('cipher.audio');
   Call? _call;
   bool _micOn = true;
   bool _camOn = true;
@@ -40,6 +42,10 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
           ),
         );
       } catch (_) {}
+
+      try {
+        await _audioChannel.invokeMethod('configureForCall');
+      } catch (_) {}
       setState(() => _call = call);
     } catch (_) {
       if (mounted) setState(() => _call = null);
@@ -49,6 +55,9 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   @override
   void dispose() {
     _call?.leave();
+    try {
+      _audioChannel.invokeMethod('resetAfterCall');
+    } catch (_) {}
     super.dispose();
   }
 
