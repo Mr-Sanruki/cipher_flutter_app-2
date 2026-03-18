@@ -88,7 +88,6 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             return StreamCallControls(
               options: [
                 ...base,
-                ToggleScreenShareOption(call: call, localParticipant: localParticipant),
               ],
             );
           },
