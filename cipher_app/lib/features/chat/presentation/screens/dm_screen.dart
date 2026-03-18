@@ -112,33 +112,6 @@ class _DmScreenState extends ConsumerState<DmScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.call_outlined),
-            onPressed: () {
-              final currentDm = resolvedDm;
-              if (myId == null || currentDm == null) return;
-              final toUserId = currentDm.otherUserId(myId);
-              ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId, callType: 'voice');
-
-              showDialog<void>(
-                context: context,
-                barrierDismissible: false,
-                builder: (ctx) => const AlertDialog(title: Text('Calling...'), content: Text('Waiting for other user to accept')),
-              );
-
-              ref
-                  .read(chatRepositoryProvider)
-                  .callEvents()
-                  .firstWhere((e) => e['callId'] == widget.dmId && e['fromUserId'] == toUserId)
-                  .then((e) {
-                if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-                if (e['event'] == 'accepted' && context.mounted) context.push('/call/${widget.dmId}');
-              }).catchError((_) {
-                if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
-              });
-            },
-            tooltip: 'Voice call',
-          ),
-          IconButton(
             icon: const Icon(Icons.videocam_outlined),
             onPressed: () {
               final currentDm = resolvedDm;
