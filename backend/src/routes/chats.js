@@ -1,11 +1,15 @@
 const express = require('express');
+const mongoose = require('mongoose');
 
 const { requireAuth } = require('../middleware/auth');
+const { encryptText, decryptText } = require('../lib/message_crypto');
+
 const { Workspace } = require('../models/Workspace');
 const { Channel } = require('../models/Channel');
 const { Group } = require('../models/Group');
 const { Dm } = require('../models/Dm');
 const { Message } = require('../models/Message');
+const { Report } = require('../models/Report');
 const { ChatClear } = require('../models/ChatClear');
 const { ChatHide } = require('../models/ChatHide');
 
@@ -60,13 +64,15 @@ function toMessageDto(m) {
     senderId: String(m.senderId),
     senderName: m.senderName,
     senderAvatar: m.senderAvatar,
-    content: m.content,
+    content: decryptText(m.content),
     type: m.type,
     fileUrl: m.fileUrl,
     fileName: m.fileName,
     fileSize: m.fileSize,
     isEdited: Boolean(m.isEdited),
     isDeleted: Boolean(m.isDeleted),
+    pinnedAt: m.pinnedAt || null,
+    pinnedBy: m.pinnedBy ? String(m.pinnedBy) : null,
     threadCount: Number(m.threadCount || 0),
     parentMessageId: m.parentMessageId ? String(m.parentMessageId) : null,
     deliveredTo: mapToObj(m.deliveredTo),
@@ -78,7 +84,7 @@ function toMessageDto(m) {
           chatType: m.forwardOf.chatType,
           chatId: m.forwardOf.chatId ? String(m.forwardOf.chatId) : null,
           senderId: m.forwardOf.senderId ? String(m.forwardOf.senderId) : null,
-          content: m.forwardOf.content,
+          content: m.forwardOf.content != null ? decryptText(m.forwardOf.content) : null,
           type: m.forwardOf.type,
           fileUrl: m.forwardOf.fileUrl,
           fileName: m.forwardOf.fileName,
@@ -100,6 +106,13 @@ function emitToUser(io, userId, event, payload) {
   const id = String(userId || '').trim();
   if (!id) return;
   io.to(`user:${id}`).emit(event, payload);
+}
+
+async function isWorkspaceAdmin(workspaceId, userId) {
+  const ws = await Workspace.findById(workspaceId).lean();
+  if (!ws) return false;
+  if (String(ws.ownerId) === String(userId)) return true;
+  return (ws.adminIds || []).some((x) => String(x) === String(userId));
 }
 
 function createChatsRouter(io) {
@@ -163,6 +176,11 @@ function createChatsRouter(io) {
 
     const authz = await authorizeChatAccess({ chatType, chatId, userId });
     if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    if (chatType === 'channel') {
+      const allowed = await isWorkspaceAdmin(authz.workspaceId, userId);
+      if (!allowed) return res.status(403).json({ error: 'FORBIDDEN' });
+    }
     const workspaceId = authz.workspaceId;
 
     if (chatType === 'dm') {
@@ -185,7 +203,8 @@ function createChatsRouter(io) {
       senderId: userId,
       senderName,
       senderAvatar,
-      content,
+      content: encryptText(content),
+      contentSearch: content,
       type,
       fileUrl,
       fileName,
@@ -345,17 +364,12 @@ function createChatsRouter(io) {
 
     // If this user previously hid the DM, starting/opening it should unhide it.
     await ChatHide.deleteMany({ userId, chatType: 'dm', chatId: String(dm._id) });
-
-    return res.json({ dm: toDmDto(dm.toObject()) });
-  });
-
-  // Messages
-  router.get('/:chatType/:chatId/messages', requireAuth, async (req, res) => {
-    const userId = req.user?.sub;
     const chatType = String(req.params.chatType || '').trim();
     const chatId = String(req.params.chatId || '').trim();
-    const limit = Math.min(Number(req.query.limit || 50), 100);
+    const messageId = String(req.params.messageId || '').trim();
 
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+    if (!messageId) return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED' });
     if (!['channel', 'dm', 'group'].includes(chatType)) {
       return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
     }
@@ -367,6 +381,7 @@ function createChatsRouter(io) {
     const filter = {
       chatType,
       chatId,
+      parentMessageId: null,
       ...(clear?.clearedAt ? { createdAt: { $gt: new Date(clear.clearedAt) } } : {}),
     };
 
@@ -381,16 +396,38 @@ function createChatsRouter(io) {
     const q = String(req.query.q || '').trim();
     const limit = Math.min(Number(req.query.limit || 30), 50);
 
+    const senderId = req.query.senderId != null ? String(req.query.senderId).trim() : '';
+    const type = req.query.type != null ? String(req.query.type).trim() : '';
+    const from = req.query.from != null ? new Date(String(req.query.from)) : null;
+    const to = req.query.to != null ? new Date(String(req.query.to)) : null;
+    const includeDeleted = String(req.query.includeDeleted || '').trim() === '1';
+    const pinnedOnly = String(req.query.pinnedOnly || '').trim() === '1';
+
     if (!q) return res.status(400).json({ error: 'QUERY_REQUIRED' });
     if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
 
     const authz = await authorizeChatAccess({ chatType, chatId, userId });
     if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
 
-    const items = await Message.find(
-      { chatType, chatId, isDeleted: false, $text: { $search: q } },
-      { score: { $meta: 'textScore' } }
-    )
+    const filter = {
+      chatType,
+      chatId,
+      ...(includeDeleted ? {} : { isDeleted: false }),
+      ...(senderId ? { senderId } : {}),
+      ...(type ? { type } : {}),
+      ...(pinnedOnly ? { pinnedAt: { $ne: null } } : {}),
+      ...(from || to
+        ? {
+            createdAt: {
+              ...(from ? { $gte: from } : {}),
+              ...(to ? { $lte: to } : {}),
+            },
+          }
+        : {}),
+      $text: { $search: q },
+    };
+
+    const items = await Message.find(filter, { score: { $meta: 'textScore' } })
       .sort({ score: { $meta: 'textScore' }, createdAt: -1 })
       .limit(limit)
       .lean();
@@ -417,12 +454,75 @@ function createChatsRouter(io) {
     if (String(msg.senderId) !== String(userId)) return res.status(403).json({ error: 'FORBIDDEN' });
 
     msg.isDeleted = true;
-    msg.content = 'This message was deleted';
+    // Hide content from clients, and remove from search. (Encrypted original content is not retained in MVP.)
+    msg.content = encryptText('This message was deleted');
+    msg.contentSearch = 'This message was deleted';
     await msg.save();
 
     const dto = toMessageDto(msg.toObject());
     if (io) io.to(roomFor(chatType, chatId)).emit('message:update', dto);
     return res.json({ ok: true, message: dto });
+  });
+
+  router.post('/:chatType/:chatId/messages/:messageId/restore', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const chatType = String(req.params.chatType || '').trim();
+    const chatId = String(req.params.chatId || '').trim();
+    const messageId = String(req.params.messageId || '').trim();
+
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+    if (!messageId) return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED' });
+
+    const authz = await authorizeChatAccess({ chatType, chatId, userId });
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    const allowed = await isWorkspaceAdmin(authz.workspaceId, userId);
+    if (!allowed) return res.status(403).json({ error: 'FORBIDDEN' });
+
+    const msg = await Message.findOne({ _id: messageId, chatType, chatId });
+    if (!msg) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    msg.isDeleted = false;
+    msg.contentSearch = decryptText(msg.content);
+    await msg.save();
+
+    const dto = toMessageDto(msg.toObject());
+    if (io) io.to(roomFor(chatType, chatId)).emit('message:update', dto);
+    return res.json({ ok: true, message: dto });
+  });
+
+  router.post('/:chatType/:chatId/messages/:messageId/report', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const chatType = String(req.params.chatType || '').trim();
+    const chatId = String(req.params.chatId || '').trim();
+    const messageId = String(req.params.messageId || '').trim();
+    const reason = String(req.body?.reason || '').trim();
+    const details = req.body?.details != null ? String(req.body.details).trim() : undefined;
+
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+    if (!messageId) return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED' });
+    if (!reason) return res.status(400).json({ error: 'REASON_REQUIRED' });
+
+    const authz = await authorizeChatAccess({ chatType, chatId, userId });
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    const msg = await Message.findOne({ _id: messageId, chatType, chatId }).lean();
+    if (!msg) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    await Report.create({
+      workspaceId: authz.workspaceId,
+      reporterId: userId,
+      targetType: 'message',
+      chatType,
+      chatId,
+      messageId,
+      targetUserId: msg.senderId,
+      reason,
+      details,
+      createdAt: new Date(),
+    });
+
+    return res.json({ ok: true });
   });
 
   router.post('/:chatType/:chatId/clear', requireAuth, async (req, res) => {
@@ -539,6 +639,65 @@ function createChatsRouter(io) {
     return res.json({ message: dto });
   });
 
+  router.post('/:chatType/:chatId/messages/:messageId/pin', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const chatType = String(req.params.chatType || '').trim();
+    const chatId = String(req.params.chatId || '').trim();
+    const messageId = String(req.params.messageId || '').trim();
+
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+    if (!messageId) return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED' });
+
+    const authz = await authorizeChatAccess({ chatType, chatId, userId });
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    if (chatType === 'channel') {
+      const allowed = await isWorkspaceAdmin(authz.workspaceId, userId);
+      if (!allowed) return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    const now = new Date();
+    const updated = await Message.findOneAndUpdate(
+      { _id: messageId, chatType, chatId },
+      { $set: { pinnedAt: now, pinnedBy: userId } },
+      { new: true }
+    ).lean();
+    if (!updated) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const dto = toMessageDto(updated);
+    if (io) io.to(roomFor(chatType, chatId)).emit('message:update', dto);
+    return res.json({ message: dto });
+  });
+
+  router.post('/:chatType/:chatId/messages/:messageId/unpin', requireAuth, async (req, res) => {
+    const userId = req.user?.sub;
+    const chatType = String(req.params.chatType || '').trim();
+    const chatId = String(req.params.chatId || '').trim();
+    const messageId = String(req.params.messageId || '').trim();
+
+    if (!['channel', 'dm', 'group'].includes(chatType)) return res.status(400).json({ error: 'INVALID_CHAT_TYPE' });
+    if (!messageId) return res.status(400).json({ error: 'MESSAGE_ID_REQUIRED' });
+
+    const authz = await authorizeChatAccess({ chatType, chatId, userId });
+    if (!authz.ok) return res.status(authz.status).json({ error: authz.error });
+
+    if (chatType === 'channel') {
+      const allowed = await isWorkspaceAdmin(authz.workspaceId, userId);
+      if (!allowed) return res.status(403).json({ error: 'FORBIDDEN' });
+    }
+
+    const updated = await Message.findOneAndUpdate(
+      { _id: messageId, chatType, chatId },
+      { $unset: { pinnedAt: 1, pinnedBy: 1 } },
+      { new: true }
+    ).lean();
+    if (!updated) return res.status(404).json({ error: 'NOT_FOUND' });
+
+    const dto = toMessageDto(updated);
+    if (io) io.to(roomFor(chatType, chatId)).emit('message:update', dto);
+    return res.json({ message: dto });
+  });
+
   router.post('/:chatType/:chatId/messages/:messageId/forward', requireAuth, async (req, res) => {
     const userId = req.user?.sub;
     const chatType = String(req.params.chatType || '').trim();
@@ -573,6 +732,7 @@ function createChatsRouter(io) {
       senderName,
       senderAvatar,
       content: original.content,
+      contentSearch: decryptText(original.content),
       type: original.type,
       fileUrl: original.fileUrl,
       fileName: original.fileName,
@@ -596,7 +756,10 @@ function createChatsRouter(io) {
     });
 
     if (targetChatType === 'dm') {
-      await Dm.updateOne({ _id: targetChatId }, { $set: { lastMessage: msg.content, lastMessageAt: now } });
+      await Dm.updateOne(
+        { _id: targetChatId },
+        { $set: { lastMessage: decryptText(msg.content), lastMessageAt: now } }
+      );
     }
 
     const dto = toMessageDto(msg.toObject());

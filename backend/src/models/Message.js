@@ -11,6 +11,7 @@ const messageSchema = new mongoose.Schema(
     senderAvatar: { type: String },
 
     content: { type: String, required: true },
+    contentSearch: { type: String },
     type: { type: String, default: 'text' },
     fileUrl: { type: String },
     fileName: { type: String },
@@ -18,6 +19,8 @@ const messageSchema = new mongoose.Schema(
 
     isEdited: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
+    pinnedAt: { type: Date },
+    pinnedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     threadCount: { type: Number, default: 0 },
 
     parentMessageId: { type: mongoose.Schema.Types.ObjectId, index: true },
@@ -47,8 +50,9 @@ const messageSchema = new mongoose.Schema(
 );
 
 messageSchema.index({ chatType: 1, chatId: 1, createdAt: -1 });
+messageSchema.index({ chatType: 1, chatId: 1, pinnedAt: -1 });
 messageSchema.index({ parentMessageId: 1, createdAt: 1 });
-messageSchema.index({ content: 'text' });
+messageSchema.index({ contentSearch: 'text' });
 
 const Message = mongoose.model('Message', messageSchema);
 

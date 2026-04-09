@@ -46,6 +46,33 @@ final messageSearchProvider = FutureProvider.family<List<MessageModel>, ({String
       .searchMessages(chatType: args.chatType, chatId: args.chatId, query: args.query.trim());
 });
 
+final advancedMessageSearchProvider = FutureProvider.family<
+    List<MessageModel>,
+    ({
+      String chatType,
+      String chatId,
+      String query,
+      String? senderId,
+      MessageType? type,
+      DateTime? from,
+      DateTime? to,
+      bool includeDeleted,
+      bool pinnedOnly,
+    })>((ref, args) async {
+  if (args.query.trim().isEmpty) return [];
+  return ref.watch(chatRepositoryProvider).searchMessages(
+        chatType: args.chatType,
+        chatId: args.chatId,
+        query: args.query.trim(),
+        senderId: args.senderId,
+        type: args.type,
+        from: args.from,
+        to: args.to,
+        includeDeleted: args.includeDeleted,
+        pinnedOnly: args.pinnedOnly,
+      );
+});
+
 final threadMessagesProvider =
     StreamProvider.family<List<MessageModel>, ({String chatType, String chatId, String messageId})>((ref, args) {
   return ref.watch(chatRepositoryProvider).getThreadMessages(
@@ -139,6 +166,34 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
     );
   }
 
+  Future<void> reportMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+    required String reason,
+    String? details,
+  }) async {
+    state = await AsyncValue.guard(() => _repo.reportMessage(
+          chatType: chatType,
+          chatId: chatId,
+          messageId: messageId,
+          reason: reason,
+          details: details,
+        ));
+  }
+
+  Future<void> restoreMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+  }) async {
+    state = await AsyncValue.guard(() => _repo.restoreMessage(
+          chatType: chatType,
+          chatId: chatId,
+          messageId: messageId,
+        ));
+  }
+
   Future<void> clearChat({required String chatType, required String chatId}) async {
     state = await AsyncValue.guard(() => _repo.clearChat(chatType: chatType, chatId: chatId));
   }
@@ -155,6 +210,26 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = await AsyncValue.guard(() async {
       await _repo.toggleReaction(chatType: chatType, chatId: chatId, messageId: messageId, emoji: emoji);
+    });
+  }
+
+  Future<void> pinMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+  }) async {
+    state = await AsyncValue.guard(() async {
+      await _repo.pinMessage(chatType: chatType, chatId: chatId, messageId: messageId);
+    });
+  }
+
+  Future<void> unpinMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+  }) async {
+    state = await AsyncValue.guard(() async {
+      await _repo.unpinMessage(chatType: chatType, chatId: chatId, messageId: messageId);
     });
   }
 

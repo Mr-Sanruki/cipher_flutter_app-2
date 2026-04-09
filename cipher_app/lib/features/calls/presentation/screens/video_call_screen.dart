@@ -81,11 +81,27 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
       callContentBuilder: (context, call, callState) {
         return Stack(
           children: [
-            StreamCallContent(
-              call: call,
-              callState: callState,
-              pictureInPictureConfiguration: const PictureInPictureConfiguration(
-                enablePictureInPicture: false,
+            Positioned.fill(
+              child: SafeArea(
+                bottom: false,
+                child: StreamCallContent(
+                  call: call,
+                  callState: callState,
+                  pictureInPictureConfiguration: const PictureInPictureConfiguration(
+                    enablePictureInPicture: false,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              child: SafeArea(
+                bottom: false,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
               ),
             ),
             Positioned(

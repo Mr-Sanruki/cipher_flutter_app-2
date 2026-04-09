@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../data/models/message_model.dart';
 import '../providers/chat_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../workspace/presentation/providers/workspace_provider.dart';
 
 class MessageBubble extends ConsumerWidget {
   final MessageModel message;
@@ -43,6 +44,46 @@ class MessageBubble extends ConsumerWidget {
         ),
       );
     }
+
+  void _showReportPicker(BuildContext context, WidgetRef ref) {
+    const reasons = [
+      'Spam',
+      'Harassment',
+      'Hate speech',
+      'Explicit content',
+      'Other',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Text('Report message', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            for (final r in reasons)
+              ListTile(
+                title: Text(r),
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(messageNotifierProvider.notifier).reportMessage(
+                        chatType: chatType,
+                        chatId: chatId,
+                        messageId: message.id,
+                        reason: r,
+                      );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reported')));
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
 
     final bubbleColor = isMe ? cs.primary : cs.surfaceContainerHighest;
     final bubbleBorder = !isMe ? Border.all(color: cs.outline.withValues(alpha: 0.45)) : null;
@@ -154,6 +195,10 @@ class MessageBubble extends ConsumerWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (message.pinnedAt != null) ...[
+                        Icon(Icons.push_pin, size: 14, color: metaColor),
+                        const SizedBox(width: 4),
+                      ],
                       Text(
                         timeago.format(message.createdAt),
                         style: TextStyle(color: metaColor, fontSize: 11),
@@ -269,24 +314,59 @@ class MessageBubble extends ConsumerWidget {
 
   IconData _receiptIcon(String? currentUserId) {
     if (currentUserId == null) return Icons.check;
-    if (message.readBy.isNotEmpty) return Icons.done_all;
-    if (message.deliveredTo.isNotEmpty) return Icons.done_all;
+
+    final deliveredCount = message.deliveredTo.length;
+    final readCount = message.readBy.length;
+    final othersDelivered = deliveredCount > 1;
+    final othersRead = readCount > 1;
+
+    if (othersRead) return Icons.done_all;
+    if (othersDelivered) return Icons.done_all;
     return Icons.check;
   }
 
   Color _receiptColor(String? currentUserId) {
     if (currentUserId == null) return Colors.grey;
-    if (message.readBy.isNotEmpty) return const Color(0xFF6C63FF);
+
+    final readCount = message.readBy.length;
+    final othersRead = readCount > 1;
+
+    if (othersRead) return const Color(0xFF6C63FF);
     return Colors.grey;
   }
 
   void _showMessageOptions(BuildContext context, WidgetRef ref, bool isMe) {
+    final myId = ref.read(backendUserIdProvider);
+    final workspace = ref.read(selectedWorkspaceProvider);
+    final canPin = chatType != 'channel' || (workspace?.isAdmin(myId ?? '') ?? false);
+
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (canPin)
+              ListTile(
+                leading: Icon(message.pinnedAt != null ? Icons.push_pin : Icons.push_pin_outlined),
+                title: Text(message.pinnedAt != null ? 'Unpin' : 'Pin'),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (message.pinnedAt != null) {
+                    ref.read(messageNotifierProvider.notifier).unpinMessage(
+                          chatType: chatType,
+                          chatId: chatId,
+                          messageId: message.id,
+                        );
+                  } else {
+                    ref.read(messageNotifierProvider.notifier).pinMessage(
+                          chatType: chatType,
+                          chatId: chatId,
+                          messageId: message.id,
+                        );
+                  }
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.emoji_emotions_outlined),
               title: const Text('React'),
@@ -303,6 +383,15 @@ class MessageBubble extends ConsumerWidget {
                 _showForwardPicker(context, ref);
               },
             ),
+            if (!isMe)
+              ListTile(
+                leading: const Icon(Icons.flag_outlined),
+                title: const Text('Report'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showReportPicker(context, ref);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.reply_outlined),
               title: const Text('Reply in thread'),

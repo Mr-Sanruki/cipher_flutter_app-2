@@ -22,6 +22,50 @@ class GroupScreen extends ConsumerStatefulWidget {
 class _GroupScreenState extends ConsumerState<GroupScreen> {
   ProviderSubscription<AsyncValue<List<MessageModel>>>? _messagesSub;
 
+  Future<void> _showSummary(BuildContext context) async {
+    try {
+      final data = await ref.read(chatRepositoryProvider).summarizeChat(
+            chatType: 'group',
+            chatId: widget.groupId,
+          );
+      final summary = (data['summary'] ?? '').toString().trim();
+      final items = (data['actionItems'] is List) ? (data['actionItems'] as List) : const [];
+
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('AI Summary'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(summary.isNotEmpty ? summary : 'No summary'),
+                if (items.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Action items', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  for (final it in items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text('- ${(it is Map ? it['task'] : it).toString()}'),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +142,11 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
             onPressed: () {
               context.push('/chat-search/group/${widget.groupId}');
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.summarize_outlined),
+            onPressed: () => _showSummary(context),
+            tooltip: 'AI summary',
           ),
           IconButton(
             icon: const Icon(Icons.person_add_alt_1_outlined),

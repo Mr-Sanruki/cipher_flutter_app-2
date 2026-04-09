@@ -70,6 +70,7 @@ class MessageModel extends Equatable {
   final String id;
   final String? chatType;
   final String? chatId;
+  final String? parentMessageId;
   final String senderId;
   final String senderName;
   final String? senderAvatar;
@@ -80,6 +81,8 @@ class MessageModel extends Equatable {
   final String? fileSize;
   final bool isEdited;
   final bool isDeleted;
+  final DateTime? pinnedAt;
+  final String? pinnedBy;
   final int threadCount;
   final Map<String, DateTime> deliveredTo;
   final Map<String, DateTime> readBy;
@@ -92,6 +95,7 @@ class MessageModel extends Equatable {
     required this.id,
     this.chatType,
     this.chatId,
+    this.parentMessageId,
     required this.senderId,
     required this.senderName,
     this.senderAvatar,
@@ -102,6 +106,8 @@ class MessageModel extends Equatable {
     this.fileSize,
     this.isEdited = false,
     this.isDeleted = false,
+    this.pinnedAt,
+    this.pinnedBy,
     this.threadCount = 0,
     this.deliveredTo = const {},
     this.readBy = const {},
@@ -140,6 +146,7 @@ class MessageModel extends Equatable {
       id: (json['id'] ?? '').toString(),
       chatType: json['chatType']?.toString(),
       chatId: json['chatId']?.toString(),
+      parentMessageId: json['parentMessageId']?.toString(),
       senderId: (json['senderId'] ?? '').toString(),
       senderName: (json['senderName'] ?? '').toString(),
       senderAvatar: json['senderAvatar']?.toString(),
@@ -153,6 +160,8 @@ class MessageModel extends Equatable {
       fileSize: json['fileSize']?.toString(),
       isEdited: json['isEdited'] == true,
       isDeleted: json['isDeleted'] == true,
+      pinnedAt: json['pinnedAt'] != null ? parseDate(json['pinnedAt']) : null,
+      pinnedBy: json['pinnedBy']?.toString(),
       threadCount: (json['threadCount'] is num) ? (json['threadCount'] as num).toInt() : 0,
       deliveredTo: parseMap(json['deliveredTo']),
       readBy: parseMap(json['readBy']),
@@ -169,6 +178,7 @@ class MessageModel extends Equatable {
     'id': id,
     'chatType': chatType,
     'chatId': chatId,
+    'parentMessageId': parentMessageId,
     'senderId': senderId,
     'senderName': senderName,
     'senderAvatar': senderAvatar,
@@ -179,6 +189,8 @@ class MessageModel extends Equatable {
     'fileSize': fileSize,
     'isEdited': isEdited,
     'isDeleted': isDeleted,
+    'pinnedAt': pinnedAt?.toUtc().toIso8601String(),
+    'pinnedBy': pinnedBy,
     'threadCount': threadCount,
     'deliveredTo': deliveredTo.map((k, v) => MapEntry(k, v.toUtc().toIso8601String())),
     'readBy': readBy.map((k, v) => MapEntry(k, v.toUtc().toIso8601String())),
@@ -192,6 +204,8 @@ class MessageModel extends Equatable {
     String? content,
     bool? isEdited,
     bool? isDeleted,
+    DateTime? pinnedAt,
+    String? pinnedBy,
     int? threadCount,
     Map<String, DateTime>? deliveredTo,
     Map<String, DateTime>? readBy,
@@ -202,6 +216,7 @@ class MessageModel extends Equatable {
     id: id,
     chatType: chatType,
     chatId: chatId,
+    parentMessageId: parentMessageId,
     senderId: senderId,
     senderName: senderName,
     senderAvatar: senderAvatar,
@@ -212,6 +227,8 @@ class MessageModel extends Equatable {
     fileSize: fileSize,
     isEdited: isEdited ?? this.isEdited,
     isDeleted: isDeleted ?? this.isDeleted,
+    pinnedAt: pinnedAt ?? this.pinnedAt,
+    pinnedBy: pinnedBy ?? this.pinnedBy,
     threadCount: threadCount ?? this.threadCount,
     deliveredTo: deliveredTo ?? this.deliveredTo,
     readBy: readBy ?? this.readBy,
@@ -222,5 +239,5 @@ class MessageModel extends Equatable {
   );
 
   @override
-  List<Object?> get props => [id, chatType, chatId, senderId, content, isEdited, isDeleted, deliveredTo, readBy, reactions, forwardOf];
+  List<Object?> get props => [id, chatType, chatId, parentMessageId, senderId, content, isEdited, isDeleted, pinnedAt, pinnedBy, deliveredTo, readBy, reactions, forwardOf];
 }

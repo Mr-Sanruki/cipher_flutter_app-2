@@ -44,6 +44,75 @@ class ChatRepository {
     return {'Authorization': 'Bearer $token'};
   }
 
+  Future<Map<String, dynamic>> summarizeChat({
+    required String chatType,
+    required String chatId,
+    int limit = 80,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/ai/summary',
+        data: {
+          'chatType': chatType,
+          'chatId': chatId,
+          'limit': limit,
+        },
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
+  Future<MessageModel> pinMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/chats/$chatType/$chatId/messages/$messageId/pin',
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['message'] is Map) {
+        return MessageModel.fromJson(Map<String, dynamic>.from(data['message']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
+  Future<MessageModel> unpinMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/chats/$chatType/$chatId/messages/$messageId/unpin',
+        options: Options(headers: _headers()),
+      );
+      final data = res.data;
+      if (data is Map && data['message'] is Map) {
+        return MessageModel.fromJson(Map<String, dynamic>.from(data['message']));
+      }
+      throw Exception('Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
+
   void _disposeSocket() {
     try {
       _socket?.dispose();
@@ -439,6 +508,7 @@ class ChatRepository {
           if (payload is! Map) return;
           final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
           if (m.chatType != chatType || m.chatId != chatId) return;
+          if (m.parentMessageId != null) return;
           final cur = _messageCache[key] ?? [];
           if (cur.any((x) => x.id == m.id)) return;
           final next = [m, ...cur];
@@ -565,6 +635,34 @@ class ChatRepository {
     );
   }
 
+  Future<void> reportMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+    required String reason,
+    String? details,
+  }) async {
+    await _dio.post(
+      '/chats/$chatType/$chatId/messages/$messageId/report',
+      data: {
+        'reason': reason,
+        'details': details,
+      },
+      options: Options(headers: _headers()),
+    );
+  }
+
+  Future<void> restoreMessage({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+  }) async {
+    await _dio.post(
+      '/chats/$chatType/$chatId/messages/$messageId/restore',
+      options: Options(headers: _headers()),
+    );
+  }
+
   Future<void> clearChat({required String chatType, required String chatId}) async {
     await _dio.post(
       '/chats/$chatType/$chatId/clear',
@@ -640,11 +738,28 @@ class ChatRepository {
     required String chatId,
     required String query,
     int limit = 30,
+    String? senderId,
+    MessageType? type,
+    DateTime? from,
+    DateTime? to,
+    bool includeDeleted = false,
+    bool pinnedOnly = false,
   }) async {
     try {
+      final qp = <String, dynamic>{
+        'q': query,
+        'limit': limit,
+      };
+      if (senderId != null && senderId.trim().isNotEmpty) qp['senderId'] = senderId.trim();
+      if (type != null) qp['type'] = type.name;
+      if (from != null) qp['from'] = from.toUtc().toIso8601String();
+      if (to != null) qp['to'] = to.toUtc().toIso8601String();
+      if (includeDeleted) qp['includeDeleted'] = '1';
+      if (pinnedOnly) qp['pinnedOnly'] = '1';
+
       final res = await _dio.get(
         '/chats/$chatType/$chatId/messages/search',
-        queryParameters: {'q': query, 'limit': limit},
+        queryParameters: qp,
         options: Options(headers: _headers()),
       );
       final data = res.data;
