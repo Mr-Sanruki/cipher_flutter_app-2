@@ -48,93 +48,105 @@ class _MessageSearchScreenState extends ConsumerState<MessageSearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
+        title: const Text('Search'),
+      ),
+      body: SafeArea(
+        child: Column(
           children: [
-            TextField(
-              controller: _ctrl,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Search messages...',
-                prefixIcon: Icon(Icons.search, color: cs.onSurface.withValues(alpha: 0.65)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                isDense: true,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<MessageType?>(
-                    value: _type,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _ctrl,
+                    autofocus: true,
                     decoration: InputDecoration(
-                      filled: true,
-                      fillColor: cs.surfaceContainerHighest,
+                      hintText: 'Search messages...',
+                      prefixIcon: Icon(Icons.search, color: cs.onSurface.withValues(alpha: 0.65)),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
                       ),
-                      isDense: true,
+                      filled: true,
+                      fillColor: cs.surfaceContainerHighest,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      isDense: true,
                     ),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('All types')),
-                      DropdownMenuItem(value: MessageType.text, child: Text('Text')),
-                      DropdownMenuItem(value: MessageType.image, child: Text('Image')),
-                      DropdownMenuItem(value: MessageType.file, child: Text('File')),
-                      DropdownMenuItem(value: MessageType.video, child: Text('Video')),
-                      DropdownMenuItem(value: MessageType.audio, child: Text('Audio')),
-                    ],
-                    onChanged: (v) => setState(() => _type = v),
+                    onChanged: (_) => setState(() {}),
                   ),
-                ),
-                const SizedBox(width: 12),
-                FilterChip(
-                  label: const Text('Pinned'),
-                  selected: _pinnedOnly,
-                  onSelected: (v) => setState(() => _pinnedOnly = v),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<MessageType?>(
+                          value: _type,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: null, child: Text('All types')),
+                            DropdownMenuItem(value: MessageType.text, child: Text('Text')),
+                            DropdownMenuItem(value: MessageType.image, child: Text('Image')),
+                            DropdownMenuItem(value: MessageType.file, child: Text('File')),
+                            DropdownMenuItem(value: MessageType.video, child: Text('Video')),
+                            DropdownMenuItem(value: MessageType.audio, child: Text('Audio')),
+                          ],
+                          onChanged: (v) => setState(() => _type = v),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      FilterChip(
+                        label: const Text('Pinned'),
+                        selected: _pinnedOnly,
+                        onSelected: (v) => setState(() => _pinnedOnly = v),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: q.trim().isEmpty
+                  ? Center(
+                      child: Text(
+                        'Type to search',
+                        style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                      ),
+                    )
+                  : resultsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Error: $e')),
+                      data: (items) {
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No results',
+                              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                            ),
+                          );
+                        }
+                        return ListView.builder(
+                          reverse: false,
+                          itemCount: items.length,
+                          itemBuilder: (_, i) => MessageBubble(
+                            message: items[i],
+                            chatType: widget.chatType,
+                            chatId: widget.chatId,
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
       ),
-      body: q.trim().isEmpty
-          ? Center(
-              child: Text(
-                'Type to search',
-                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
-              ),
-            )
-          : resultsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (items) {
-                if (items.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No results',
-                      style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  reverse: false,
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => MessageBubble(
-                    message: items[i],
-                    chatType: widget.chatType,
-                    chatId: widget.chatId,
-                  ),
-                );
-              },
-            ),
     );
   }
 }

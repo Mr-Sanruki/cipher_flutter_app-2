@@ -496,9 +496,19 @@ class ChatRepository {
     _messageControllers[key] = controller;
 
     () async {
-      final initial = await listMessages(chatType: chatType, chatId: chatId);
-      _messageCache[key] = initial;
-      if (!controller.isClosed) controller.add(initial);
+      try {
+        final initial = await listMessages(chatType: chatType, chatId: chatId).timeout(
+              const Duration(seconds: 25),
+              onTimeout: () => throw Exception('MESSAGES_LOAD_TIMEOUT'),
+            );
+        _messageCache[key] = initial;
+        if (!controller.isClosed) controller.add(initial);
+      } catch (e, st) {
+        if (kDebugMode) debugPrint('[messages] initial load failed chatType=$chatType chatId=$chatId error=$e');
+        if (!controller.isClosed) controller.addError(e, st);
+        // Also publish an empty list so the UI can render instead of spinning forever.
+        if (!controller.isClosed) controller.add(const []);
+      }
 
       _ensureSocketConnected();
       _socket?.emit('chat:join', {'chatType': chatType, 'chatId': chatId});
