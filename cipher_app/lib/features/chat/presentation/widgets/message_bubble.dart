@@ -45,46 +45,6 @@ class MessageBubble extends ConsumerWidget {
       );
     }
 
-  void _showReportPicker(BuildContext context, WidgetRef ref) {
-    const reasons = [
-      'Spam',
-      'Harassment',
-      'Hate speech',
-      'Explicit content',
-      'Other',
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Text('Report message', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-            for (final r in reasons)
-              ListTile(
-                title: Text(r),
-                onTap: () {
-                  Navigator.pop(context);
-                  ref.read(messageNotifierProvider.notifier).reportMessage(
-                        chatType: chatType,
-                        chatId: chatId,
-                        messageId: message.id,
-                        reason: r,
-                      );
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reported')));
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
     final bubbleColor = isMe ? cs.primary : cs.surfaceContainerHighest;
     final bubbleBorder = !isMe ? Border.all(color: cs.outline.withValues(alpha: 0.45)) : null;
     final textColor = isMe ? cs.onPrimary : cs.onSurface;
@@ -463,6 +423,46 @@ class MessageBubble extends ConsumerWidget {
             child: const Text('Save'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showReportPicker(BuildContext context, WidgetRef ref) {
+    const reasons = [
+      'Spam',
+      'Harassment',
+      'Hate speech',
+      'Explicit content',
+      'Other',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Text('Report message', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            for (final r in reasons)
+              ListTile(
+                title: Text(r),
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(messageNotifierProvider.notifier).reportMessage(
+                        chatType: chatType,
+                        chatId: chatId,
+                        messageId: message.id,
+                        reason: r,
+                      );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reported')));
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

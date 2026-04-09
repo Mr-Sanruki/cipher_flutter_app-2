@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
+import '../../data/models/message_model.dart';
 
 class MessageSearchScreen extends ConsumerStatefulWidget {
   final String chatType;

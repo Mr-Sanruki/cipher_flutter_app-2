@@ -7,6 +7,7 @@ import '../widgets/message_input_bar.dart';
 import '../../../workspace/presentation/providers/workspace_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/message_model.dart';
+import '../../data/repositories/chat_repository.dart';
 
 class ChannelScreen extends ConsumerStatefulWidget {
   final String channelId;
