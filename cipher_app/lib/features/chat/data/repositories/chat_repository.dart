@@ -616,6 +616,10 @@ class ChatRepository {
         if (persisted.isNotEmpty) {
           _messageCache[key] = persisted;
           if (!controller.isClosed) controller.add(persisted);
+        } else {
+          // Ensure the UI leaves the loading state immediately even if we haven't
+          // cached/persisted any messages for this chat yet.
+          if (!controller.isClosed) controller.add(const []);
         }
 
         () async {
