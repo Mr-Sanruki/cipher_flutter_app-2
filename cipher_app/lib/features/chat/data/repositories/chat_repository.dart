@@ -30,6 +30,7 @@ class ChatRepository {
   final _callEventController = StreamController<Map<String, String>>.broadcast();
   final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
   final Map<String, List<MessageModel>> _messageCache = {};
+  final Set<String> _activeChats = {}; // Track chats with active listeners for resync
 
   Box get _messagesBox => Hive.box(AppConstants.messagesBox);
 
@@ -52,6 +53,51 @@ class ChatRepository {
       final payload = messages.map((m) => m.toJson()).toList(growable: false);
       await _messagesBox.put(key, payload);
     } catch (_) {}
+  }
+
+  Future<void> _upsertIncomingTopLevelMessage(MessageModel m) async {
+    if (m.parentMessageId != null) return;
+    if (m.chatType == null || m.chatId == null) return;
+
+    final key = _key(m.chatType!, m.chatId!);
+
+    // Prefer in-memory cache if available, otherwise fall back to persisted list.
+    var cur = _messageCache[key];
+    cur ??= _readPersistedMessages(key);
+
+    if (cur.any((x) => x.id == m.id)) return;
+
+    final next = [m, ...cur];
+    final capped = next.length > 60 ? next.take(60).toList(growable: false) : next;
+
+    _messageCache[key] = capped;
+    await _persistMessages(key, capped);
+
+    final controller = _messageControllers[key];
+    if (controller != null && !controller.isClosed) controller.add(capped);
+  }
+
+  /// Resync active chats after socket reconnect to catch any missed messages.
+  Future<void> _resyncActiveChats() async {
+    if (_activeChats.isEmpty) return;
+    if (kDebugMode) debugPrint('[socket] resyncing ${_activeChats.length} active chats');
+
+    for (final key in _activeChats.toList()) {
+      final parts = key.split(':');
+      if (parts.length != 2) continue;
+      final chatType = parts[0];
+      final chatId = parts[1];
+
+      try {
+        final messages = await listMessages(chatType: chatType, chatId: chatId);
+        _messageCache[key] = messages;
+        await _persistMessages(key, messages);
+        final controller = _messageControllers[key];
+        if (controller != null && !controller.isClosed) controller.add(messages);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[socket] resync failed for $key: $e');
+      }
+    }
   }
 
   ChatRepository(this._authRepo, {required String baseUrl})
@@ -150,6 +196,12 @@ class ChatRepository {
     _socketToken = null;
   }
 
+  /// Public method to ensure socket is connected.
+  /// Call this early (e.g., after login) to start receiving user-room events.
+  void ensureSocketConnected() {
+    _ensureSocketConnected();
+  }
+
   void _ensureSocketConnected() {
     final token = _authRepo.getSavedToken();
     if (token == null) return;
@@ -183,12 +235,24 @@ class ChatRepository {
 
     s.on('connect', (_) {
       if (kDebugMode) debugPrint('[socket] connected id=${s.id}');
+      // Resync active chats on reconnect to catch any missed messages.
+      _resyncActiveChats();
     });
     s.on('disconnect', (reason) {
       if (kDebugMode) debugPrint('[socket] disconnected reason=$reason');
     });
     s.on('connect_error', (e) {
       if (kDebugMode) debugPrint('[socket] connect_error $e');
+    });
+
+    // Global message delivery (from user room): ensures messages are received even
+    // when the user is not currently viewing a specific chat screen.
+    s.on('message:new', (payload) {
+      try {
+        if (payload is! Map) return;
+        final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
+        unawaited(_upsertIncomingTopLevelMessage(m));
+      } catch (_) {}
     });
 
     s.on('chat:cleared', (payload) async {
@@ -575,6 +639,7 @@ class ChatRepository {
 
           _ensureSocketConnected();
           _socket?.emit('chat:join', {'chatType': chatType, 'chatId': chatId});
+          _activeChats.add(key); // Track for resync on reconnect
 
           void onNew(dynamic payload) {
             try {
@@ -617,6 +682,7 @@ class ChatRepository {
             _socket?.off('message:update', onUpdate);
             _messageControllers.remove(key);
             _messageCache.remove(key);
+            _activeChats.remove(key);
           };
         }();
       },

@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/presence/presence_lifecycle.dart';
 import 'core/notifications/notification_service.dart';
+import 'core/socket/socket_lifecycle.dart';
 import 'features/calls/presentation/providers/incoming_call_provider.dart';
 import 'features/calls/presentation/providers/call_provider.dart';
 import 'features/chat/data/repositories/chat_repository.dart';
@@ -124,6 +125,7 @@ class _CipherAppState extends ConsumerState<CipherApp> {
   Widget build(BuildContext context) {
     ref.watch(presenceLifecycleProvider);
     ref.watch(notificationLifecycleProvider);
+    ref.watch(socketLifecycleProvider);
     final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: AppConstants.appName,

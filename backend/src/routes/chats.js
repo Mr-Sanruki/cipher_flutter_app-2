@@ -12,6 +12,7 @@ const { Message } = require('../models/Message');
 const { Report } = require('../models/Report');
 const { ChatClear } = require('../models/ChatClear');
 const { ChatHide } = require('../models/ChatHide');
+const { ModerationReport } = require('../models/ModerationReport');
 
 function toChannelDto(c) {
   return {
@@ -230,6 +231,30 @@ function createChatsRouter(io) {
     const dto = toMessageDto(msg.toObject());
     if (io) {
       io.to(roomFor(chatType, chatId)).emit('message:new', dto);
+
+      // Also emit to user rooms so clients receive messages even when they are not
+      // actively viewing a specific chat (i.e., not joined to the chat room).
+      try {
+        let recipientIds = [];
+
+        if (chatType === 'dm') {
+          const dm = await Dm.findById(chatId).lean();
+          recipientIds = (dm?.memberIds || []).map((x) => String(x));
+        } else if (chatType === 'group') {
+          const g = await Group.findById(chatId).lean();
+          recipientIds = (g?.memberIds || []).map((x) => String(x));
+        } else if (chatType === 'channel') {
+          const c = await Channel.findById(chatId).lean();
+          if (c?.workspaceId) {
+            const ws = await Workspace.findById(c.workspaceId).lean();
+            recipientIds = (ws?.memberIds || []).map((x) => String(x));
+          }
+        }
+
+        const fromId = String(userId || '').trim();
+        const recipients = recipientIds.filter((id) => id && id !== fromId);
+        for (const rid of recipients) emitToUser(io, rid, 'message:new', dto);
+      } catch (_) {}
     }
 
     return res.status(201).json({ message: dto });
