@@ -619,6 +619,7 @@ class ChatRepository {
         } else {
           // Ensure the UI leaves the loading state immediately even if we haven't
           // cached/persisted any messages for this chat yet.
+          _messageCache[key] = const [];
           if (!controller.isClosed) controller.add(const []);
         }
 
