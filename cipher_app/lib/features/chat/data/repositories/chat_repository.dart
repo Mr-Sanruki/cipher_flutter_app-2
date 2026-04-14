@@ -593,108 +593,98 @@ class ChatRepository {
 
   Stream<List<MessageModel>> getMessages({required String chatType, required String chatId}) {
     final key = _key(chatType, chatId);
-    final existing = _messageControllers[key];
-    if (existing != null) return existing.stream;
-
-    var started = false;
-    late final StreamController<List<MessageModel>> controller;
-    controller = StreamController<List<MessageModel>>.broadcast(
-      onListen: () {
-        // Broadcast streams do not buffer events, so if we emit cached/persisted messages
-        // before Riverpod actually subscribes, the UI can stay in "loading" forever.
-        // Emit the current cache for late listeners and start loading once.
-        final cur = _messageCache[key];
-        if (cur != null && cur.isNotEmpty) {
-          if (!controller.isClosed) controller.add(cur);
-        }
-
-        if (started) return;
-        started = true;
-
-        // Show persisted messages (if any) so reopening the app doesn't look like history vanished.
+    Stream<List<MessageModel>> wrap(Stream<List<MessageModel>> updates) async* {
+      final cur = _messageCache[key];
+      if (cur != null) {
+        yield cur;
+      } else {
         final persisted = _readPersistedMessages(key);
         if (persisted.isNotEmpty) {
           _messageCache[key] = persisted;
-          if (!controller.isClosed) controller.add(persisted);
+          yield persisted;
         } else {
-          // Ensure the UI leaves the loading state immediately even if we haven't
-          // cached/persisted any messages for this chat yet.
           _messageCache[key] = const [];
-          if (!controller.isClosed) controller.add(const []);
+          yield const [];
         }
+      }
+      yield* updates;
+    }
 
-        () async {
-          try {
-            final initial = await listMessages(chatType: chatType, chatId: chatId).timeout(
-                  const Duration(seconds: 25),
-                  onTimeout: () => throw Exception('MESSAGES_LOAD_TIMEOUT'),
-                );
-            _messageCache[key] = initial;
-            if (!controller.isClosed) controller.add(initial);
-            await _persistMessages(key, initial);
-          } catch (e, st) {
-            if (kDebugMode) debugPrint('[messages] initial load failed chatType=$chatType chatId=$chatId error=$e');
-            // Only publish an error/empty list if we have nothing cached; otherwise keep showing persisted content.
-            final cur = _messageCache[key] ?? const [];
-            if (cur.isEmpty) {
-              if (!controller.isClosed) controller.addError(e, st);
-              if (!controller.isClosed) controller.add(const []);
-            }
-          }
+    final existing = _messageControllers[key];
+    if (existing != null) return wrap(existing.stream);
 
-          _ensureSocketConnected();
-          _socket?.emit('chat:join', {'chatType': chatType, 'chatId': chatId});
-          _activeChats.add(key); // Track for resync on reconnect
-
-          void onNew(dynamic payload) {
-            try {
-              if (payload is! Map) return;
-              final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
-              if (m.chatType != chatType || m.chatId != chatId) return;
-              if (m.parentMessageId != null) return;
-              final cur = _messageCache[key] ?? [];
-              if (cur.any((x) => x.id == m.id)) return;
-              final next = [m, ...cur];
-              _messageCache[key] = next;
-              if (!controller.isClosed) controller.add(next);
-              _persistMessages(key, next);
-            } catch (_) {}
-          }
-
-          _socket?.on('message:new', onNew);
-
-          void onUpdate(dynamic payload) {
-            try {
-              if (payload is! Map) return;
-              final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
-              if (m.chatType != chatType || m.chatId != chatId) return;
-              final cur = _messageCache[key] ?? [];
-              final idx = cur.indexWhere((x) => x.id == m.id);
-              if (idx < 0) return;
-              final next = [...cur];
-              next[idx] = m;
-              _messageCache[key] = next;
-              if (!controller.isClosed) controller.add(next);
-              _persistMessages(key, next);
-            } catch (_) {}
-          }
-
-          _socket?.on('message:update', onUpdate);
-
-          controller.onCancel = () {
-            _socket?.emit('chat:leave', {'chatType': chatType, 'chatId': chatId});
-            _socket?.off('message:new', onNew);
-            _socket?.off('message:update', onUpdate);
-            _messageControllers.remove(key);
-            _messageCache.remove(key);
-            _activeChats.remove(key);
-          };
-        }();
-      },
-    );
+    final controller = StreamController<List<MessageModel>>.broadcast();
     _messageControllers[key] = controller;
 
-    return controller.stream;
+    // Start background load + socket wiring exactly once per chat key.
+    () async {
+      try {
+        final initial = await listMessages(chatType: chatType, chatId: chatId).timeout(
+              const Duration(seconds: 25),
+              onTimeout: () => throw Exception('MESSAGES_LOAD_TIMEOUT'),
+            );
+        _messageCache[key] = initial;
+        if (!controller.isClosed) controller.add(initial);
+        await _persistMessages(key, initial);
+      } catch (e, st) {
+        if (kDebugMode) debugPrint('[messages] initial load failed chatType=$chatType chatId=$chatId error=$e');
+        final cur = _messageCache[key] ?? const [];
+        if (cur.isEmpty) {
+          if (!controller.isClosed) controller.addError(e, st);
+          if (!controller.isClosed) controller.add(const []);
+        }
+      }
+
+      _ensureSocketConnected();
+      _socket?.emit('chat:join', {'chatType': chatType, 'chatId': chatId});
+      _activeChats.add(key); // Track for resync on reconnect
+
+      void onNew(dynamic payload) {
+        try {
+          if (payload is! Map) return;
+          final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
+          if (m.chatType != chatType || m.chatId != chatId) return;
+          if (m.parentMessageId != null) return;
+          final cur = _messageCache[key] ?? [];
+          if (cur.any((x) => x.id == m.id)) return;
+          final next = [m, ...cur];
+          _messageCache[key] = next;
+          if (!controller.isClosed) controller.add(next);
+          _persistMessages(key, next);
+        } catch (_) {}
+      }
+
+      _socket?.on('message:new', onNew);
+
+      void onUpdate(dynamic payload) {
+        try {
+          if (payload is! Map) return;
+          final m = MessageModel.fromJson(Map<String, dynamic>.from(payload));
+          if (m.chatType != chatType || m.chatId != chatId) return;
+          final cur = _messageCache[key] ?? [];
+          final idx = cur.indexWhere((x) => x.id == m.id);
+          if (idx < 0) return;
+          final next = [...cur];
+          next[idx] = m;
+          _messageCache[key] = next;
+          if (!controller.isClosed) controller.add(next);
+          _persistMessages(key, next);
+        } catch (_) {}
+      }
+
+      _socket?.on('message:update', onUpdate);
+
+      controller.onCancel = () {
+        _socket?.emit('chat:leave', {'chatType': chatType, 'chatId': chatId});
+        _socket?.off('message:new', onNew);
+        _socket?.off('message:update', onUpdate);
+        _messageControllers.remove(key);
+        _messageCache.remove(key);
+        _activeChats.remove(key);
+      };
+    }();
+
+    return wrap(controller.stream);
   }
 
   Future<List<MessageModel>> listMessages({required String chatType, required String chatId, int limit = 50}) async {

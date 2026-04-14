@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:photo_view/photo_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/models/message_model.dart';
 import '../providers/chat_provider.dart';
@@ -277,14 +278,58 @@ class MessageBubble extends ConsumerWidget {
             if (url == null || url.isEmpty) return;
             final uri = Uri.tryParse(url);
             if (uri == null) return;
-            final ok = await canLaunchUrl(uri);
-            if (!ok) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot open this file')));
-              }
-              return;
-            }
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+            if (!context.mounted) return;
+            await showDialog<void>(
+              context: context,
+              barrierColor: Colors.black.withValues(alpha: 0.92),
+              builder: (ctx) {
+                return GestureDetector(
+                  onTap: () => Navigator.of(ctx).pop(),
+                  child: Scaffold(
+                    backgroundColor: Colors.transparent,
+                    body: SafeArea(
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: PhotoView(
+                              imageProvider: CachedNetworkImageProvider(url),
+                              backgroundDecoration: const BoxDecoration(color: Colors.transparent),
+                              heroAttributes: PhotoViewHeroAttributes(tag: 'img:${message.id}'),
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              icon: const Icon(Icons.close, color: Colors.white),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: IconButton(
+                              onPressed: () async {
+                                final ok = await canLaunchUrl(uri);
+                                if (!ok) {
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Cannot open this file')));
+                                  }
+                                  return;
+                                }
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              },
+                              icon: const Icon(Icons.open_in_new, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
           },
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
