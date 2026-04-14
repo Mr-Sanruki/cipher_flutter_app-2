@@ -157,4 +157,27 @@ class WorkspaceRepository {
       throw Exception(e.message ?? 'Network error');
     }
   }
+
+  Future<void> sendWorkspaceEmail({
+    required String workspaceId,
+    required String toUserId,
+    required String subject,
+    required String message,
+  }) async {
+    try {
+      await _dio.post(
+        '/email/workspaces/$workspaceId/send',
+        data: {
+          'toUserId': toUserId,
+          'subject': subject,
+          'message': message,
+        },
+        options: Options(headers: _headers()),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map && data['error'] != null) throw Exception(data['error'].toString());
+      throw Exception(e.message ?? 'Network error');
+    }
+  }
 }

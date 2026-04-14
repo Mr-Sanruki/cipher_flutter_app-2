@@ -16,6 +16,7 @@ class MessageBubble extends ConsumerWidget {
   final String chatId;
   final String chatType;
   final bool showSender;
+  final bool inThreadView;
 
   const MessageBubble({
     super.key,
@@ -23,6 +24,7 @@ class MessageBubble extends ConsumerWidget {
     required this.chatId,
     required this.chatType,
     this.showSender = true,
+    this.inThreadView = false,
   });
 
   @override
@@ -30,6 +32,7 @@ class MessageBubble extends ConsumerWidget {
     final myId = ref.watch(backendUserIdProvider);
     final isMe = myId != null && message.senderId == myId;
     final cs = Theme.of(context).colorScheme;
+    final hasThread = message.parentMessageId == null && message.threadCount > 0;
 
     if (message.isDeleted) {
       return Padding(
@@ -50,13 +53,29 @@ class MessageBubble extends ConsumerWidget {
     final textColor = isMe ? cs.onPrimary : cs.onSurface;
     final metaColor = cs.onSurface.withValues(alpha: 0.55);
 
+    final threadDecor = inThreadView
+        ? BoxDecoration(
+            color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+            border: Border(left: BorderSide(color: cs.primary.withValues(alpha: 0.65), width: 3)),
+          )
+        : null;
+
     return GestureDetector(
+      onTap: hasThread
+          ? () => context.push(
+                '/thread/${message.id}',
+                extra: {'chatType': chatType, 'chatId': chatId, 'message': message},
+              )
+          : null,
       onLongPress: () => _showMessageOptions(context, ref, isMe),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: Container(
+          decoration: threadDecor,
+          padding: inThreadView ? const EdgeInsets.only(left: 10, top: 6, bottom: 6) : EdgeInsets.zero,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             if (!isMe) ...[
               CircleAvatar(
                 radius: 16,
@@ -178,27 +197,31 @@ class MessageBubble extends ConsumerWidget {
                       ],
                     ],
                   ),
-                  if (message.threadCount > 0)
-                    GestureDetector(
-                      onTap: () => context.push('/thread/${message.id}',
-                          extra: {'chatType': chatType, 'chatId': chatId, 'message': message}),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 4),
+                  if (hasThread)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
+                        ),
                         child: Text(
-                          '💬 ${message.threadCount} ${message.threadCount == 1 ? 'reply' : 'replies'}',
+                          'View thread • ${message.threadCount} ${message.threadCount == 1 ? 'reply' : 'replies'}',
                           style: TextStyle(
                             color: cs.primary,
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (isMe) const SizedBox(width: 8),
-          ],
+            ],
+          ),
         ),
       ),
     );

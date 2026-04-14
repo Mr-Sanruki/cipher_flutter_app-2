@@ -37,7 +37,7 @@ class ThreadScreen extends ConsumerWidget {
           if (parentMessage != null) ...[
             Container(
               color: cs.surface,
-              child: MessageBubble(message: parentMessage, chatType: chatType, chatId: chatId, showSender: true),
+              child: MessageBubble(message: parentMessage, chatType: chatType, chatId: chatId, showSender: true, inThreadView: true),
             ),
             Divider(height: 1, color: cs.outline.withValues(alpha: 0.6)),
           ],
@@ -58,6 +58,7 @@ class ThreadScreen extends ConsumerWidget {
                         message: replies[i],
                         chatType: chatType,
                         chatId: chatId,
+                        inThreadView: true,
                       ),
                     ),
             ),

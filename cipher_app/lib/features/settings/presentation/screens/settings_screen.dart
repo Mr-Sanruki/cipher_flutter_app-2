@@ -81,6 +81,14 @@ class SettingsScreen extends ConsumerWidget {
                 _divider(context),
                 _settingsTile(
                   context,
+                  icon: Icons.email_outlined,
+                  title: 'Email',
+                  subtitle: 'Send email to workspace members',
+                  onTap: () => context.push('/settings/email'),
+                ),
+                _divider(context),
+                _settingsTile(
+                  context,
                   icon: Icons.swap_horiz_outlined,
                   title: 'Switch Workspace',
                   subtitle: 'Go to workspace list',
