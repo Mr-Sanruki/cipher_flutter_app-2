@@ -12,7 +12,6 @@ const { Message } = require('../models/Message');
 const { Report } = require('../models/Report');
 const { ChatClear } = require('../models/ChatClear');
 const { ChatHide } = require('../models/ChatHide');
-const { ModerationReport } = require('../models/ModerationReport');
 
 function toChannelDto(c) {
   return {
