@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:socket_io_client/socket_io_client.dart' as sio;
 import '../models/message_model.dart';
 import '../models/channel_model.dart';
 import '../models/group_model.dart';
 import '../models/dm_model.dart';
 import '../../../../core/config/app_config_provider.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
@@ -28,6 +30,29 @@ class ChatRepository {
   final _callEventController = StreamController<Map<String, String>>.broadcast();
   final Map<String, StreamController<List<MessageModel>>> _messageControllers = {};
   final Map<String, List<MessageModel>> _messageCache = {};
+
+  Box get _messagesBox => Hive.box(AppConstants.messagesBox);
+
+  List<MessageModel> _readPersistedMessages(String key) {
+    try {
+      final raw = _messagesBox.get(key);
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((m) => MessageModel.fromJson(Map<String, dynamic>.from(m)))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _persistMessages(String key, List<MessageModel> messages) async {
+    try {
+      // Keep only top-level messages here; threads are loaded separately.
+      final payload = messages.map((m) => m.toJson()).toList(growable: false);
+      await _messagesBox.put(key, payload);
+    } catch (_) {}
+  }
 
   ChatRepository(this._authRepo, {required String baseUrl})
       : _baseUrl = baseUrl,
@@ -495,6 +520,13 @@ class ChatRepository {
     final controller = StreamController<List<MessageModel>>.broadcast();
     _messageControllers[key] = controller;
 
+    // Immediately show persisted messages (if any) so reopening the app doesn't look like history vanished.
+    final persisted = _readPersistedMessages(key);
+    if (persisted.isNotEmpty) {
+      _messageCache[key] = persisted;
+      controller.add(persisted);
+    }
+
     () async {
       try {
         final initial = await listMessages(chatType: chatType, chatId: chatId).timeout(
@@ -503,11 +535,15 @@ class ChatRepository {
             );
         _messageCache[key] = initial;
         if (!controller.isClosed) controller.add(initial);
+        await _persistMessages(key, initial);
       } catch (e, st) {
         if (kDebugMode) debugPrint('[messages] initial load failed chatType=$chatType chatId=$chatId error=$e');
         if (!controller.isClosed) controller.addError(e, st);
-        // Also publish an empty list so the UI can render instead of spinning forever.
-        if (!controller.isClosed) controller.add(const []);
+        // Only publish an empty list if we have nothing cached; otherwise keep showing persisted content.
+        final cur = _messageCache[key] ?? const [];
+        if (cur.isEmpty) {
+          if (!controller.isClosed) controller.add(const []);
+        }
       }
 
       _ensureSocketConnected();
@@ -524,6 +560,7 @@ class ChatRepository {
           final next = [m, ...cur];
           _messageCache[key] = next;
           if (!controller.isClosed) controller.add(next);
+          _persistMessages(key, next);
         } catch (_) {}
       }
 
@@ -541,6 +578,7 @@ class ChatRepository {
           next[idx] = m;
           _messageCache[key] = next;
           if (!controller.isClosed) controller.add(next);
+          _persistMessages(key, next);
         } catch (_) {}
       }
 

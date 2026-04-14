@@ -10,6 +10,7 @@ import '../../data/models/message_model.dart';
 import '../providers/chat_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../workspace/presentation/providers/workspace_provider.dart';
+import '../../../../core/config/app_config_provider.dart';
 
 class MessageBubble extends ConsumerWidget {
   final MessageModel message;
@@ -32,6 +33,19 @@ class MessageBubble extends ConsumerWidget {
     final myId = ref.watch(backendUserIdProvider);
     final isMe = myId != null && message.senderId == myId;
     final cs = Theme.of(context).colorScheme;
+    final cfg = ref.watch(appConfigProvider);
+
+    String? resolveUrl(String? raw) {
+      final u = (raw ?? '').trim();
+      if (u.isEmpty) return null;
+      final uri = Uri.tryParse(u);
+      if (uri == null) return null;
+      if (uri.hasScheme) return u;
+      final base = cfg.backendBaseUrl.trim();
+      if (base.isEmpty) return u;
+      if (u.startsWith('/')) return '$base$u';
+      return '$base/$u';
+    }
     final hasThread = message.parentMessageId == null && message.threadCount > 0;
     final isThreadParentInMainChat = hasThread && !inThreadView;
 
@@ -58,6 +72,7 @@ class MessageBubble extends ConsumerWidget {
         : (!isMe ? Border.all(color: cs.outline.withValues(alpha: 0.45)) : null);
     final textColor = isMe ? cs.onPrimary : cs.onSurface;
     final metaColor = cs.onSurface.withValues(alpha: 0.55);
+    final contentWidget = _buildContent(context, isMe, textColor, resolveUrl: resolveUrl);
 
     return GestureDetector(
       onTap: hasThread
@@ -170,7 +185,7 @@ class MessageBubble extends ConsumerWidget {
                               ),
                             ),
                           ],
-                          _buildContent(context, isMe, textColor),
+                          contentWidget,
                         ],
                       ),
                     ),
@@ -246,13 +261,19 @@ class MessageBubble extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(BuildContext context, bool isMe, Color textColor) {
+  Widget _buildContent(
+    BuildContext context,
+    bool isMe,
+    Color textColor, {
+    required String? Function(String?) resolveUrl,
+  }) {
     final cs = Theme.of(context).colorScheme;
+
     switch (message.type) {
       case MessageType.image:
         return InkWell(
           onTap: () async {
-            final url = message.fileUrl;
+            final url = resolveUrl(message.fileUrl);
             if (url == null || url.isEmpty) return;
             final uri = Uri.tryParse(url);
             if (uri == null) return;
@@ -261,7 +282,7 @@ class MessageBubble extends ConsumerWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: CachedNetworkImage(
-              imageUrl: message.fileUrl ?? '',
+              imageUrl: resolveUrl(message.fileUrl) ?? '',
               width: 200,
               fit: BoxFit.cover,
               placeholder: (_, __) => const SizedBox(
@@ -274,7 +295,7 @@ class MessageBubble extends ConsumerWidget {
       case MessageType.audio:
         return InkWell(
           onTap: () async {
-            final url = message.fileUrl;
+            final url = resolveUrl(message.fileUrl);
             if (url == null || url.isEmpty) return;
             final uri = Uri.tryParse(url);
             if (uri == null) return;

@@ -23,6 +23,7 @@ class AppConstants {
   // Hive Boxes
   static const String userBox = 'user_box';
   static const String settingsBox = 'settings_box';
+  static const String messagesBox = 'messages_box';
 
   // Storage Paths
   static const String profileImages = 'profile_images';

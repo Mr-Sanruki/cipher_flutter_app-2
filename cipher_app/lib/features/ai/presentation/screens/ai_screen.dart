@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/ai_provider.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../chat/data/models/message_model.dart';
 
 class AiScreen extends ConsumerStatefulWidget {
   const AiScreen({super.key});
@@ -138,26 +142,228 @@ class _AiScreenState extends ConsumerState<AiScreen> {
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-        decoration: BoxDecoration(
-          color: bubbleColor,
-          border: bubbleBorder,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: isUser ? const Radius.circular(16) : Radius.zero,
-            bottomRight: isUser ? Radius.zero : const Radius.circular(16),
+      child: Column(
+        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              border: bubbleBorder,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: isUser ? const Radius.circular(16) : Radius.zero,
+                bottomRight: isUser ? Radius.zero : const Radius.circular(16),
+              ),
+            ),
+            child: Text(
+              message.content,
+              style: TextStyle(color: textColor, fontSize: 15),
+            ),
           ),
-        ),
-        child: Text(
-          message.content,
-          style: TextStyle(color: textColor, fontSize: 15),
+          if (!isUser)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Copy',
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: message.content));
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied')));
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Share',
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  onPressed: () async {
+                    await Share.share(message.content);
+                  },
+                ),
+                IconButton(
+                  tooltip: 'Send to chat',
+                  icon: const Icon(Icons.send_outlined, size: 18),
+                  onPressed: () => _showSendToChatSheet(context, message.content),
+                ),
+              ],
+            ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showSendToChatSheet(BuildContext context, String text) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Send to DM'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showPickChatAndSend(context, text, chatType: 'dm');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.tag),
+              title: const Text('Send to Channel'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showPickChatAndSend(context, text, chatType: 'channel');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: const Text('Send to Group'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showPickChatAndSend(context, text, chatType: 'group');
+              },
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _showPickChatAndSend(BuildContext context, String text, {required String chatType}) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        Widget body;
+        if (chatType == 'dm') {
+          final dmsAsync = ref.watch(dmsProvider);
+          body = dmsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('Error: $e'),
+            ),
+            data: (dms) => ListView(
+              shrinkWrap: true,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                  child: Text('Pick a DM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+                for (final dm in dms)
+                  ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: const Text('DM'),
+                    subtitle: Text(
+                      dm.lastMessage != null && dm.lastMessage!.isNotEmpty
+                          ? dm.lastMessage!
+                          : dm.memberIds.join(', '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _sendToChat(context, text, chatType: 'dm', chatId: dm.id);
+                    },
+                  ),
+              ],
+            ),
+          );
+        } else if (chatType == 'channel') {
+          final channelsAsync = ref.watch(channelsProvider);
+          body = channelsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('Error: $e'),
+            ),
+            data: (channels) => ListView(
+              shrinkWrap: true,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                  child: Text('Pick a channel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+                for (final c in channels)
+                  ListTile(
+                    leading: const Icon(Icons.tag),
+                    title: Text('# ${c.name}'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _sendToChat(context, text, chatType: 'channel', chatId: c.id);
+                    },
+                  ),
+              ],
+            ),
+          );
+        } else {
+          final groupsAsync = ref.watch(groupsProvider);
+          body = groupsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('Error: $e'),
+            ),
+            data: (groups) => ListView(
+              shrinkWrap: true,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                  child: Text('Pick a group', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+                for (final g in groups)
+                  ListTile(
+                    leading: const Icon(Icons.groups_outlined),
+                    title: Text(g.name),
+                    subtitle: Text('${g.memberIds.length} members'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await _sendToChat(context, text, chatType: 'group', chatId: g.id);
+                    },
+                  ),
+              ],
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+            child: body,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _sendToChat(BuildContext context, String text, {required String chatType, required String chatId}) async {
+    try {
+      await ref.read(messageNotifierProvider.notifier).sendMessage(
+            chatType: chatType,
+            chatId: chatId,
+            content: text,
+            type: MessageType.text,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sent')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   Widget _buildTyping() => Align(

@@ -52,6 +52,9 @@ emailRouter.post('/workspaces/:workspaceId/send', requireAuth, async (req, res) 
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'BREVO_API_KEY_MISSING' });
 
+  const configuredSenderEmail = process.env.BREVO_SENDER_EMAIL;
+  if (!configuredSenderEmail) return res.status(500).json({ error: 'BREVO_SENDER_EMAIL_MISSING' });
+
   try {
     const ws = await Workspace.findById(workspaceId).lean();
     if (!ws) return res.status(404).json({ error: 'WORKSPACE_NOT_FOUND' });
@@ -73,10 +76,8 @@ emailRouter.post('/workspaces/:workspaceId/send', requireAuth, async (req, res) 
     const replyToEmail = String(fromUser.email);
     const replyToName = String(fromUser.name || 'User');
 
-    const configuredSenderEmail = process.env.BREVO_SENDER_EMAIL;
     const configuredSenderName = process.env.BREVO_SENDER_NAME;
-
-    const fromEmail = configuredSenderEmail ? String(configuredSenderEmail) : replyToEmail;
+    const fromEmail = String(configuredSenderEmail);
     const fromName = configuredSenderName ? String(configuredSenderName) : replyToName;
 
     const text = `From: ${fromUser.name} (${fromUser.email})\nWorkspace: ${ws.name}\n\n${message}`;
