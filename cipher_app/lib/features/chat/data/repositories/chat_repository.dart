@@ -553,10 +553,10 @@ class ChatRepository {
         await _persistMessages(key, initial);
       } catch (e, st) {
         if (kDebugMode) debugPrint('[messages] initial load failed chatType=$chatType chatId=$chatId error=$e');
-        if (!controller.isClosed) controller.addError(e, st);
-        // Only publish an empty list if we have nothing cached; otherwise keep showing persisted content.
+        // Only publish an error/empty list if we have nothing cached; otherwise keep showing persisted content.
         final cur = _messageCache[key] ?? const [];
         if (cur.isEmpty) {
+          if (!controller.isClosed) controller.addError(e, st);
           if (!controller.isClosed) controller.add(const []);
         }
       }

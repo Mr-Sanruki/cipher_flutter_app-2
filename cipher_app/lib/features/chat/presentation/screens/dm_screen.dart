@@ -145,10 +145,18 @@ class _DmScreenState extends ConsumerState<DmScreen> {
 
     final dmFallbackAsync = (dm == null && myId != null)
         ? ref.watch(FutureProvider.autoDispose<DmModel>((ref) async {
-            return ref.watch(chatRepositoryProvider).getDmById(dmId: widget.dmId);
+            try {
+              return await ref.read(chatRepositoryProvider).getDmById(dmId: widget.dmId);
+            } catch (_) {
+              return DmModel(id: '', workspaceId: '', memberIds: [], createdAt: DateTime.fromMillisecondsSinceEpoch(0));
+            }
           }))
         : const AsyncValue.data(null);
-    final resolvedDm = dm ?? dmFallbackAsync.value;
+    final resolvedDm = (dm != null)
+        ? dm
+        : (dmFallbackAsync.hasError || (dmFallbackAsync.value?.id ?? '').isEmpty)
+            ? null
+            : dmFallbackAsync.value;
 
     final otherId = (resolvedDm != null && myId != null) ? resolvedDm.otherUserId(myId) : '';
     final otherUserAsync = otherId.isNotEmpty ? ref.watch(userByIdProvider(otherId)) : const AsyncValue.data(null);
