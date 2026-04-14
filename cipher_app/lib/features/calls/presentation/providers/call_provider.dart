@@ -4,6 +4,10 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/data/repositories/auth_repository.dart';
 
+typedef CallSession = ({String callId, String peerUserId});
+
+final callSessionProvider = StateProvider<CallSession?>((ref) => null);
+
 final streamVideoProvider = FutureProvider<StreamVideo>((ref) async {
   final userId = ref.watch(backendUserIdProvider);
   if (userId == null) {

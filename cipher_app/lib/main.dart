@@ -8,6 +8,7 @@ import 'core/router/app_router.dart';
 import 'core/presence/presence_lifecycle.dart';
 import 'core/notifications/notification_service.dart';
 import 'features/calls/presentation/providers/incoming_call_provider.dart';
+import 'features/calls/presentation/providers/call_provider.dart';
 import 'features/chat/data/repositories/chat_repository.dart';
 import 'features/auth/presentation/providers/user_lookup_provider.dart';
 
@@ -99,6 +100,7 @@ class _CipherAppState extends ConsumerState<CipherApp> {
                         onPressed: () {
                           ref.read(incomingCallProvider.notifier).clear();
                           ref.read(chatRepositoryProvider).sendCallAccept(toUserId: fromUserId, callId: callId, callType: normalizedType);
+                          ref.read(callSessionProvider.notifier).state = (callId: callId, peerUserId: fromUserId);
                           Navigator.pop(ctx);
                           navCtx.push('/video-call/$callId');
                         },

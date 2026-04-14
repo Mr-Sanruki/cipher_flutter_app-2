@@ -277,6 +277,13 @@ class MessageBubble extends ConsumerWidget {
             if (url == null || url.isEmpty) return;
             final uri = Uri.tryParse(url);
             if (uri == null) return;
+            final ok = await canLaunchUrl(uri);
+            if (!ok) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot open this file')));
+              }
+              return;
+            }
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
           child: ClipRRect(
@@ -299,6 +306,13 @@ class MessageBubble extends ConsumerWidget {
             if (url == null || url.isEmpty) return;
             final uri = Uri.tryParse(url);
             if (uri == null) return;
+            final ok = await canLaunchUrl(uri);
+            if (!ok) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot open this file')));
+              }
+              return;
+            }
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
           child: Row(

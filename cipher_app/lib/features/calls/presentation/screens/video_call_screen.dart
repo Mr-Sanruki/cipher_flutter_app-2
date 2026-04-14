@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
 import '../providers/call_provider.dart';
+import '../../../chat/data/repositories/chat_repository.dart';
 
 class VideoCallScreen extends ConsumerStatefulWidget {
   final String callId;
@@ -25,8 +26,21 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
     _initCall();
   }
 
+  void _listenRemoteEnd() {
+    try {
+      ref.read(chatRepositoryProvider).callEvents().listen((e) {
+        final callId = e['callId'];
+        final event = e['event'];
+        if (callId == widget.callId && event == 'ended') {
+          if (mounted) Navigator.of(context).maybePop();
+        }
+      });
+    } catch (_) {}
+  }
+
   Future<void> _initCall() async {
     try {
+      _listenRemoteEnd();
       final streamVideo = await ref.read(streamVideoProvider.future);
       final call = streamVideo.makeCall(
         callType: StreamCallType.defaultType(),
@@ -54,6 +68,16 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
   @override
   void dispose() {
+    final session = ref.read(callSessionProvider);
+    if (session != null && session.callId == widget.callId) {
+      try {
+        ref.read(chatRepositoryProvider).sendCallEnd(
+              toUserId: session.peerUserId,
+              callId: widget.callId,
+            );
+      } catch (_) {}
+      ref.read(callSessionProvider.notifier).state = null;
+    }
     _call?.leave();
     try {
       _audioChannel.invokeMethod('resetAfterCall');
@@ -153,6 +177,15 @@ class _VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                     } catch (_) {}
                   },
                   onEnd: () async {
+                    final session = ref.read(callSessionProvider);
+                    if (session != null && session.callId == widget.callId) {
+                      try {
+                        ref.read(chatRepositoryProvider).sendCallEnd(
+                              toUserId: session.peerUserId,
+                              callId: widget.callId,
+                            );
+                      } catch (_) {}
+                    }
                     try {
                       await call.leave();
                     } catch (_) {}

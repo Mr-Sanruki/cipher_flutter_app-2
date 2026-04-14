@@ -123,6 +123,15 @@ async function start() {
       if (!fromUserId || !to || !id) return;
       io.to(`user:${to}`).emit('call:declined', { fromUserId, callId: id, callType: type });
     });
+
+    socket.on('call:end', ({ toUserId, callId, callType }) => {
+      const fromUserId = String(socket.user?.sub || '').trim();
+      const to = String(toUserId || '').trim();
+      const id = String(callId || '').trim();
+      const type = 'video';
+      if (!fromUserId || !to || !id) return;
+      io.to(`user:${to}`).emit('call:ended', { fromUserId, callId: id, callType: type });
+    });
   });
 
   app.use('/chats', createChatsRouter(io));

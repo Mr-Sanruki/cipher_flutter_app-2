@@ -246,6 +246,17 @@ class ChatRepository {
       } catch (_) {}
     });
 
+    s.on('call:ended', (payload) {
+      try {
+        if (payload is! Map) return;
+        final fromUserId = (payload['fromUserId'] ?? '').toString().trim();
+        final callId = (payload['callId'] ?? '').toString().trim();
+        const callType = 'video';
+        if (fromUserId.isEmpty || callId.isEmpty) return;
+        _callEventController.add({'event': 'ended', 'fromUserId': fromUserId, 'callId': callId, 'callType': callType});
+      } catch (_) {}
+    });
+
     s.connect();
     _socket = s;
     _socketToken = token;
@@ -296,6 +307,10 @@ class ChatRepository {
 
   void sendCallDecline({required String toUserId, required String callId, String callType = 'video'}) {
     _emitWhenConnected('call:decline', {'toUserId': toUserId, 'callId': callId, 'callType': 'video'});
+  }
+
+  void sendCallEnd({required String toUserId, required String callId, String callType = 'video'}) {
+    _emitWhenConnected('call:end', {'toUserId': toUserId, 'callId': callId, 'callType': 'video'});
   }
 
   // ─── Channels ───────────────────────────────────────────────
@@ -874,6 +889,9 @@ class ChatRepository {
         'senderName': message.senderName,
         'senderAvatar': message.senderAvatar,
         'type': message.type.name,
+        'fileUrl': message.fileUrl,
+        'fileName': message.fileName,
+        'fileSize': message.fileSize,
       },
       options: Options(headers: _headers()),
     );

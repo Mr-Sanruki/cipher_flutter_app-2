@@ -61,7 +61,11 @@ class _EmailMembersScreenState extends ConsumerState<EmailMembersScreen> {
       setState(() => _selected = null);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      final raw = e.toString();
+      final msg = raw.contains('BREVO_SENDER_EMAIL_MISSING')
+          ? 'Email sending is not configured. Set BREVO_SENDER_EMAIL in backend .env (must be a verified Brevo sender).'
+          : 'Error: $e';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

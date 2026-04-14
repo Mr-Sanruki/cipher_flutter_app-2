@@ -6,11 +6,12 @@ import 'package:share_plus/share_plus.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
+import '../../data/models/message_model.dart';
 import '../../data/repositories/chat_repository.dart';
+import '../../../calls/presentation/providers/call_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/user_lookup_provider.dart';
 import '../../data/models/dm_model.dart';
-import '../../data/models/message_model.dart';
 
 class DmScreen extends ConsumerStatefulWidget {
   final String dmId;
@@ -188,11 +189,12 @@ class _DmScreenState extends ConsumerState<DmScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.videocam_outlined),
-            onPressed: () {
-              final currentDm = resolvedDm;
-              if (myId == null || currentDm == null) return;
-              final toUserId = currentDm.otherUserId(myId);
-              ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId, callType: 'video');
+            onPressed: () async {
+              final toUserId = otherId;
+              if (toUserId.isEmpty) return;
+              ref.read(chatRepositoryProvider).sendCallInvite(toUserId: toUserId, callId: widget.dmId);
+
+              ref.read(callSessionProvider.notifier).state = (callId: widget.dmId, peerUserId: toUserId);
 
               showDialog<void>(
                 context: context,
