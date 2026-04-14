@@ -218,6 +218,13 @@ function createChatsRouter(io) {
 
     if (parentMessageIdRaw) {
       await Message.updateOne({ _id: parentMessageIdRaw }, { $inc: { threadCount: 1 } });
+
+      if (io) {
+        const parent = await Message.findById(parentMessageIdRaw).lean();
+        if (parent) {
+          io.to(roomFor(chatType, chatId)).emit('message:update', toMessageDto(parent));
+        }
+      }
     }
 
     const dto = toMessageDto(msg.toObject());

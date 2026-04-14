@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_input_bar.dart';
@@ -56,6 +58,29 @@ class _GroupScreenState extends ConsumerState<GroupScreen> {
             ),
           ),
           actions: [
+            TextButton(
+              onPressed: () async {
+                final text = [
+                  if (summary.isNotEmpty) summary,
+                  if (items.isNotEmpty) '\nAction items:\n${items.map((it) => '- ${(it is Map ? it['task'] : it).toString()}').join('\n')}',
+                ].join('\n').trim();
+                await Clipboard.setData(ClipboardData(text: text));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied')));
+                }
+              },
+              child: const Text('Copy'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final text = [
+                  if (summary.isNotEmpty) summary,
+                  if (items.isNotEmpty) '\nAction items:\n${items.map((it) => '- ${(it is Map ? it['task'] : it).toString()}').join('\n')}',
+                ].join('\n').trim();
+                await Share.share(text);
+              },
+              child: const Text('Share'),
+            ),
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
           ],
         ),

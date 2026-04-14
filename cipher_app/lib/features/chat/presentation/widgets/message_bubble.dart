@@ -33,6 +33,7 @@ class MessageBubble extends ConsumerWidget {
     final isMe = myId != null && message.senderId == myId;
     final cs = Theme.of(context).colorScheme;
     final hasThread = message.parentMessageId == null && message.threadCount > 0;
+    final isThreadParentInMainChat = hasThread && !inThreadView;
 
     if (message.isDeleted) {
       return Padding(
@@ -48,17 +49,15 @@ class MessageBubble extends ConsumerWidget {
       );
     }
 
-    final bubbleColor = isMe ? cs.primary : cs.surfaceContainerHighest;
-    final bubbleBorder = !isMe ? Border.all(color: cs.outline.withValues(alpha: 0.45)) : null;
+    final bubbleColor = isMe
+        ? (isThreadParentInMainChat ? cs.primary.withValues(alpha: 0.92) : cs.primary)
+        : (isThreadParentInMainChat ? cs.surfaceContainerHighest.withValues(alpha: 0.85) : cs.surfaceContainerHighest);
+
+    final bubbleBorder = isThreadParentInMainChat
+        ? Border.all(color: cs.primary.withValues(alpha: 0.55), width: 1.2)
+        : (!isMe ? Border.all(color: cs.outline.withValues(alpha: 0.45)) : null);
     final textColor = isMe ? cs.onPrimary : cs.onSurface;
     final metaColor = cs.onSurface.withValues(alpha: 0.55);
-
-    final threadDecor = inThreadView
-        ? BoxDecoration(
-            color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-            border: Border(left: BorderSide(color: cs.primary.withValues(alpha: 0.65), width: 3)),
-          )
-        : null;
 
     return GestureDetector(
       onTap: hasThread
@@ -71,90 +70,110 @@ class MessageBubble extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: Container(
-          decoration: threadDecor,
-          padding: inThreadView ? const EdgeInsets.only(left: 10, top: 6, bottom: 6) : EdgeInsets.zero,
+          decoration: null,
+          padding: EdgeInsets.zero,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            if (!isMe) ...[
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: cs.surfaceContainerHighest,
-                backgroundImage: message.senderAvatar != null
-                    ? CachedNetworkImageProvider(message.senderAvatar!)
-                    : null,
-                child: message.senderAvatar == null
-                    ? Text(message.senderName[0].toUpperCase(),
-                        style: TextStyle(color: cs.onSurface, fontSize: 12, fontWeight: FontWeight.w700))
-                    : null,
-              ),
-              const SizedBox(width: 8),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  if (showSender && !isMe)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(message.senderName,
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: cs.onSurface)),
-                    ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: bubbleColor,
-                      border: bubbleBorder,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
-                        bottomRight: isMe ? Radius.zero : const Radius.circular(16),
+              if (!isMe) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: cs.surfaceContainerHighest,
+                  backgroundImage: message.senderAvatar != null
+                      ? CachedNetworkImageProvider(message.senderAvatar!)
+                      : null,
+                  child: message.senderAvatar == null
+                      ? Text(message.senderName[0].toUpperCase(),
+                          style: TextStyle(color: cs.onSurface, fontSize: 12, fontWeight: FontWeight.w700))
+                      : null,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    if (showSender && !isMe)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          message.senderName,
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: cs.onSurface),
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (message.forwardOf != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            decoration: BoxDecoration(
-                              color: isMe
-                                  ? cs.onPrimary.withValues(alpha: 0.14)
-                                  : cs.onSurface.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: bubbleColor,
+                        border: bubbleBorder,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
+                          bottomRight: isMe ? Radius.zero : const Radius.circular(16),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isThreadParentInMainChat) ...[
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
+                                Icon(Icons.forum_outlined, size: 14, color: isMe ? cs.onPrimary : cs.primary),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'Forwarded',
+                                  'Thread',
                                   style: TextStyle(
-                                    color: isMe ? cs.onPrimary.withValues(alpha: 0.75) : metaColor,
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  (message.forwardOf?.content ?? '').toString(),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isMe ? cs.onPrimary : cs.primary,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                          ],
+                          if (message.forwardOf != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? cs.onPrimary.withValues(alpha: 0.14)
+                                    : cs.onSurface.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Forwarded',
+                                    style: TextStyle(
+                                      color: isMe ? cs.onPrimary.withValues(alpha: 0.75) : metaColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    (message.forwardOf?.content ?? '').toString(),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          _buildContent(context, isMe, textColor),
                         ],
-                        _buildContent(context, isMe, textColor),
-                      ],
+                      ),
                     ),
-                  ),
                   if (message.reactions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),

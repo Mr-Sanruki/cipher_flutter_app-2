@@ -6,7 +6,7 @@ const { User } = require('../models/User');
 
 const emailRouter = express.Router();
 
-async function sendViaBrevo({ apiKey, fromEmail, fromName, toEmail, toName, subject, text }) {
+async function sendViaBrevo({ apiKey, fromEmail, fromName, replyToEmail, replyToName, toEmail, toName, subject, text }) {
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -16,6 +16,7 @@ async function sendViaBrevo({ apiKey, fromEmail, fromName, toEmail, toName, subj
     },
     body: JSON.stringify({
       sender: { email: fromEmail, name: fromName },
+      replyTo: replyToEmail ? { email: replyToEmail, name: replyToName || undefined } : undefined,
       to: [{ email: toEmail, name: toName }],
       subject,
       textContent: text,
@@ -51,11 +52,6 @@ emailRouter.post('/workspaces/:workspaceId/send', requireAuth, async (req, res) 
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'BREVO_API_KEY_MISSING' });
 
-  const fromEmail = process.env.BREVO_SENDER_EMAIL;
-  if (!fromEmail) return res.status(500).json({ error: 'BREVO_SENDER_EMAIL_MISSING' });
-
-  const fromName = process.env.BREVO_SENDER_NAME || 'Cipher Workspace';
-
   try {
     const ws = await Workspace.findById(workspaceId).lean();
     if (!ws) return res.status(404).json({ error: 'WORKSPACE_NOT_FOUND' });
@@ -72,6 +68,16 @@ emailRouter.post('/workspaces/:workspaceId/send', requireAuth, async (req, res) 
     if (!fromUser) return res.status(404).json({ error: 'SENDER_NOT_FOUND' });
     if (!toUser) return res.status(404).json({ error: 'RECIPIENT_NOT_FOUND' });
     if (!toUser.email) return res.status(400).json({ error: 'RECIPIENT_EMAIL_MISSING' });
+    if (!fromUser.email) return res.status(400).json({ error: 'SENDER_EMAIL_MISSING' });
+
+    const replyToEmail = String(fromUser.email);
+    const replyToName = String(fromUser.name || 'User');
+
+    const configuredSenderEmail = process.env.BREVO_SENDER_EMAIL;
+    const configuredSenderName = process.env.BREVO_SENDER_NAME;
+
+    const fromEmail = configuredSenderEmail ? String(configuredSenderEmail) : replyToEmail;
+    const fromName = configuredSenderName ? String(configuredSenderName) : replyToName;
 
     const text = `From: ${fromUser.name} (${fromUser.email})\nWorkspace: ${ws.name}\n\n${message}`;
 
@@ -79,6 +85,8 @@ emailRouter.post('/workspaces/:workspaceId/send', requireAuth, async (req, res) 
       apiKey,
       fromEmail,
       fromName,
+      replyToEmail,
+      replyToName,
       toEmail: String(toUser.email),
       toName: String(toUser.name || ''),
       subject,

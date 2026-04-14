@@ -273,6 +273,44 @@ class MessageNotifier extends StateNotifier<AsyncValue<void>> {
       await _repo.sendThreadMessage(chatType: chatType, chatId: chatId, messageId: messageId, message: msg);
     });
   }
+
+  Future<void> sendThreadFile({
+    required String chatType,
+    required String chatId,
+    required String messageId,
+    required File file,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final userModel = await _ref.read(authRepositoryProvider).getCurrentUser();
+      final fileName = file.path.split('/').last;
+      final fileSize = '${(await file.length() / 1024).toStringAsFixed(1)} KB';
+      final fileUrl = await _repo.uploadFile(file, chatId);
+      final ext = fileName.split('.').last.toLowerCase();
+      final type = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)
+          ? MessageType.image
+          : ['mp4', 'mov', 'avi'].contains(ext)
+              ? MessageType.video
+              : ['mp3', 'aac', 'wav'].contains(ext)
+                  ? MessageType.audio
+                  : MessageType.file;
+
+      final msg = MessageModel(
+        id: '',
+        senderId: '',
+        senderName: userModel?.name ?? 'User',
+        senderAvatar: userModel?.avatarUrl,
+        content: fileName,
+        type: type,
+        fileUrl: fileUrl,
+        fileName: fileName,
+        fileSize: fileSize,
+        createdAt: DateTime.now(),
+      );
+
+      await _repo.sendThreadMessage(chatType: chatType, chatId: chatId, messageId: messageId, message: msg);
+    });
+  }
 }
 
 // ─── Channel/Group Notifier ─────────────────────────────────────

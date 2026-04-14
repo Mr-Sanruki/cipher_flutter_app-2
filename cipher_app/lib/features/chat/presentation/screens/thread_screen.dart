@@ -37,7 +37,7 @@ class ThreadScreen extends ConsumerWidget {
           if (parentMessage != null) ...[
             Container(
               color: cs.surface,
-              child: MessageBubble(message: parentMessage, chatType: chatType, chatId: chatId, showSender: true, inThreadView: true),
+              child: MessageBubble(message: parentMessage, chatType: chatType, chatId: chatId, showSender: true),
             ),
             Divider(height: 1, color: cs.outline.withValues(alpha: 0.6)),
           ],
@@ -58,7 +58,6 @@ class ThreadScreen extends ConsumerWidget {
                         message: replies[i],
                         chatType: chatType,
                         chatId: chatId,
-                        inThreadView: true,
                       ),
                     ),
             ),
@@ -69,6 +68,12 @@ class ThreadScreen extends ConsumerWidget {
               chatId: chatId,
               messageId: messageId,
               content: text,
+            ),
+            onSendFile: (file) => ref.read(messageNotifierProvider.notifier).sendThreadFile(
+              chatType: chatType,
+              chatId: chatId,
+              messageId: messageId,
+              file: file,
             ),
           ),
         ],
