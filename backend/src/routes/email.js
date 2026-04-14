@@ -52,7 +52,7 @@ emailRouter.post('/workspaces/:workspaceId/send', requireAuth, async (req, res) 
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'BREVO_API_KEY_MISSING' });
 
-  const configuredSenderEmail = process.env.BREVO_SENDER_EMAIL;
+  const configuredSenderEmail = process.env.BREVO_SENDER_EMAIL || process.env.BREVO_FROM_EMAIL;
   if (!configuredSenderEmail) return res.status(500).json({ error: 'BREVO_SENDER_EMAIL_MISSING' });
 
   try {
