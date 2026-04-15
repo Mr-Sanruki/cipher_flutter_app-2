@@ -430,8 +430,12 @@ class ChatRepository {
   }
 
   Stream<List<ChannelModel>> getChannels(String workspaceId, {Duration pollEvery = const Duration(seconds: 3)}) async* {
+    var last = <ChannelModel>[];
     while (true) {
-      yield await listChannels(workspaceId);
+      try {
+        last = await listChannels(workspaceId);
+      } catch (_) {}
+      yield last;
       await Future<void>.delayed(pollEvery);
     }
   }
@@ -488,8 +492,12 @@ class ChatRepository {
   }
 
   Stream<List<GroupModel>> getGroups(String workspaceId, {Duration pollEvery = const Duration(seconds: 3)}) async* {
+    var last = <GroupModel>[];
     while (true) {
-      yield await listGroups(workspaceId);
+      try {
+        last = await listGroups(workspaceId);
+      } catch (_) {}
+      yield last;
       await Future<void>.delayed(pollEvery);
     }
   }
@@ -559,8 +567,12 @@ class ChatRepository {
   }
 
   Stream<List<DmModel>> getDms(String workspaceId, {Duration pollEvery = const Duration(seconds: 3)}) async* {
+    var last = <DmModel>[];
     while (true) {
-      yield await listDms(workspaceId);
+      try {
+        last = await listDms(workspaceId);
+      } catch (_) {}
+      yield last;
       await Future<void>.delayed(pollEvery);
     }
   }
